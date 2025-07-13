@@ -2196,6 +2196,11 @@ public:
 
     void handle_array_data_stmt(const AST::DataStmt_t &x, AST::DataStmtSet_t* a, ASR::ttype_t* obj_type, ASR::expr_t* object, size_t &curr_value) {
         ASR::Array_t* array_type = ASR::down_cast<ASR::Array_t>(obj_type);
+        ASR::ttype_t* temp_current_variable_type_ = current_variable_type_;
+        if (ASR::is_a<ASR::Real_t>(*array_type->m_type)) {
+            current_variable_type_ = array_type->m_type;
+        }
+        //yash
         if (check_equal_value(a->m_value, a->n_value)) {
             /*
                 Case:
@@ -2213,6 +2218,7 @@ public:
             */
             this->visit_expr(*a->m_value[curr_value++]);
             ASR::expr_t* value = ASRUtils::EXPR(tmp);
+            current_variable_type_ = temp_current_variable_type_;
             if (!ASRUtils::types_equal(ASRUtils::expr_type(value), array_type->m_type)) {
                 diag.add(Diagnostic(
                     "Type mismatch during data initialization",
@@ -2273,6 +2279,7 @@ public:
                 }
 
             }
+            current_variable_type_ = temp_current_variable_type_;
             Vec<ASR::dimension_t> dims;
             dims.reserve(al, 1);
             ASR::dimension_t dim; dim.m_length = nullptr; dim.m_start = nullptr;
@@ -2310,6 +2317,7 @@ public:
                                           AST::DataStmtSet_t *data_stmt_set,
                                           ASR::expr_t* implied_do_loop_expr,
                                           size_t &value_index) {
+        //yash
         ASR::ImpliedDoLoop_t *implied_do_loop = ASR::down_cast<ASR::ImpliedDoLoop_t>(implied_do_loop_expr);
 
         ASR::expr_t* loop_start_expr = implied_do_loop->m_start;
@@ -2374,8 +2382,13 @@ public:
                     }
                 }
                 ASR::expr_t* target = ASRUtils::EXPR((ASR::asr_t*) array_item_expr);
+                // ASR::ttype_t* temp_current_variable_type_ = current_variable_type_;
+                // if (ASR::is_a<ASR::Real_t>(*data_stmt_set->m_object)) {
+                //         current_variable_type_ = array_type->m_type;
+                // }
                 this->visit_expr(*data_stmt_set->m_value[value_index++]);
                 ASR::expr_t* value = ASRUtils::EXPR(tmp);
+                //current_variable_type_ = temp_current_variable_type_;
                 ASRUtils::make_ArrayBroadcast_t_util(al, data_stmt.base.base.loc, target, value);
                 ASR::stmt_t* assignStatement = ASRUtils::STMT(ASRUtils::make_Assignment_t_util(al, data_stmt.base.base.loc,
                                                                                     target, value, nullptr, compiler_options.po.realloc_lhs)
@@ -2387,6 +2400,7 @@ public:
     }
 
     void handle_scalar_data_stmt(const AST::DataStmt_t &x, AST::DataStmtSet_t *a, size_t i, size_t &j) {
+        //yash
         this->visit_expr(*a->m_object[i]);
         ASR::expr_t* object = ASRUtils::EXPR(tmp);
         ASR::ttype_t* obj_type = ASRUtils::expr_type(object);
@@ -3981,7 +3995,7 @@ public:
                             }));
                         throw SemanticAbort();
                     }
-
+                    
                     value = ASRUtils::expr_value(init_expr);
                     if ( init_expr ) {
                         if( ASRUtils::is_value_constant(value) ) {
@@ -8808,7 +8822,7 @@ public:
                     diag.add(Diagnostic("No matching signature found for intrinsic " + var_name,
                                         Level::Error, Stage::Semantic, {Label("", {x.base.base.loc})}));
                     throw SemanticAbort();
-                }
+                }//yash
                 if( ASRUtils::IntrinsicElementalFunctionRegistry::is_intrinsic_function(var_name) ) {
                     const bool are_all_args_evaluated { ASRUtils::all_args_evaluated(args, true) };
                     if (!are_all_args_evaluated && var_name == "spacing") {
@@ -8836,6 +8850,7 @@ public:
                         compiletime_broadcast_elemental_intrinsic(args, &result_array, array_indices_in_args, create_func, x.base.base.loc, al);;
                         tmp = (ASR::asr_t*) result_array;
                     } else {
+                        printf("HERE3\n");
                         tmp = create_func(al, x.base.base.loc, args, diag);
                     }
                 } else if ( ASRUtils::IntrinsicArrayFunctionRegistry::is_intrinsic_function(var_name) ) {
@@ -8986,6 +9001,7 @@ public:
         const AST::FuncCallOrArray_t &x,
         Allocator &al
     ) {
+        //yash
         ASR::asr_t* asr_node { nullptr };
         std::string var_name = to_lower(x.m_func);
         Vec<ASR::call_arg_t> args;
@@ -9515,6 +9531,8 @@ public:
 
     void visit_FuncCallOrArray(const AST::FuncCallOrArray_t &x) {
         std::string var_name = to_lower(x.m_func);
+        //yash
+        printf("3333333\n");
         if (x.n_temp_args > 0) {
             ASR::symbol_t *owner_sym = ASR::down_cast<ASR::symbol_t>(current_scope->asr_owner);
             var_name = handle_templated(x.m_func, ASR::is_a<ASR::Template_t>(*ASRUtils::get_asr_owner(owner_sym)),
@@ -9560,6 +9578,7 @@ public:
             ASR::symbol_t* external_sym = is_external_procedure ? v : nullptr;
             bool is_function = true;
             if ( !is_external_procedure ) {
+                //yash
                 v = intrinsic_as_node(x, is_function);
             }
             if( !is_function ) {
