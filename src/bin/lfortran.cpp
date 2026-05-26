@@ -98,7 +98,7 @@ namespace lsi = LCompilers::LLanguageServer::Interface;
 #endif
 
 enum Backend {
-    llvm, c, cpp, x86, wasm, fortran, mlir
+    llvm, c, cpp, x86, wasm, fortran, mlir, mlir_new
 };
 
 std::string get_system_temp_dir()
@@ -1075,7 +1075,8 @@ int save_mod_files(const LCompilers::ASR::TranslationUnit_t &u,
 int handle_mlir(const std::string &infile,
         const std::string &outfile,
         CompilerOptions &compiler_options,
-        bool emit_mlir, bool emit_llvm) {
+        bool show_mlir_llvm_dialect, bool emit_mlir, bool emit_llvm,
+        bool use_mlir_new) {
     std::string input = read_file_ok(infile);
 
     LCompilers::FortranEvaluator fe(compiler_options);
@@ -1104,8 +1105,10 @@ int handle_mlir(const std::string &infile,
     LCompilers::LLVMEvaluator e(compiler_options.target);
     std::unique_ptr<LCompilers::MLIRModule> m;
     diagnostics.diagnostics.clear();
-    LCompilers::Result<std::unique_ptr<LCompilers::MLIRModule>>
-        res = fe.get_mlir(*(LCompilers::ASR::asr_t *)asr, diagnostics);
+    LCompilers::Result<std::unique_ptr<LCompilers::MLIRModule>> res =
+        use_mlir_new
+            ? fe.get_mlir_new(*(LCompilers::ASR::asr_t *)asr, diagnostics)
+            : fe.get_mlir(*(LCompilers::ASR::asr_t *)asr, diagnostics);
     std::cerr << diagnostics.render(lm, compiler_options);
     if (res.ok) {
         m = std::move(res.result);
@@ -1114,7 +1117,10 @@ int handle_mlir(const std::string &infile,
         return 2;
     }
     if (emit_mlir) {
+        // For mlir-new, mlir_str() returns the generated LLVM IR text.
         std::cout << m->mlir_str();
+    } else if (show_mlir_llvm_dialect) {
+        std::cout << m->mlir_llvm_dialect_dump();
     } else if (emit_llvm) {
         std::cout << m->llvm_str();
     } else {
@@ -1997,7 +2003,8 @@ int link_executable(const std::vector<std::string> &infiles,
         std::cout << "Cannot use static_executable and shared_executable together" << std::endl;
         return 10;
     }
-    if (backend == Backend::llvm || backend == Backend::mlir) {
+    if (backend == Backend::llvm || backend == Backend::mlir
+            || backend == Backend::mlir_new) {
         std::string run_cmd = "", compile_cmd = "";
         if (t == "x86_64-pc-windows-msvc") {
             compile_cmd = "link /NOLOGO /OUT:" + outfile + " ";
@@ -2668,8 +2675,10 @@ int main_app(int argc, char *argv[]) {
         backend = Backend::fortran;
     } else if (opts.arg_backend == "mlir") {
         backend = Backend::mlir;
+    } else if (opts.arg_backend == "mlir-new") {
+        backend = Backend::mlir_new;
     } else {
-        std::cerr << "The backend must be one of: llvm, cpp, x86, wasm, fortran, mlir." << std::endl;
+        std::cerr << "The backend must be one of: llvm, cpp, x86, wasm, fortran, mlir, mlir-new." << std::endl;
         return 1;
     }
 
@@ -2726,6 +2735,12 @@ int main_app(int argc, char *argv[]) {
         outfile = basename.replace_extension(".asr").string();
     } else if (opts.show_llvm) {
         outfile = basename.replace_extension(".ll").string();
+    } else if (opts.show_mlir && opts.arg_backend == "mlir-new") {
+        outfile = basename.replace_extension(".ll").string();
+    } else if (opts.show_mlir_llvm_dialect) {
+        outfile = basename.replace_extension(".mlir").string();
+    } else if (opts.show_mlir) {
+        outfile = basename.replace_extension(".mlir").string();
     } else if (opts.show_wat) {
         outfile = basename.replace_extension(".wat").string();
     } else if (opts.show_julia) {
@@ -2786,12 +2801,15 @@ int main_app(int argc, char *argv[]) {
         return 1;
 #endif
     }
-    if (opts.show_mlir || opts.show_llvm_from_mlir) {
+    if (opts.show_mlir || opts.show_mlir_llvm_dialect || opts.show_llvm_from_mlir) {
 #ifdef HAVE_LFORTRAN_MLIR
+        bool use_mlir_new = (opts.arg_backend == "mlir-new")
+            || opts.show_mlir_llvm_dialect;
         return handle_mlir(opts.arg_file, outfile, compiler_options,
-            opts.show_mlir, opts.show_llvm_from_mlir);
+            opts.show_mlir_llvm_dialect, opts.show_mlir, opts.show_llvm_from_mlir,
+            use_mlir_new);
 #else
-        std::cerr << "The `--show-mlir` option requires the MLIR backend to be "
+        std::cerr << "The `--show-mlir*` options require the MLIR backend to be "
             "enabled. Recompile with `WITH_MLIR=yes`." << std::endl;
         return 1;
 #endif
@@ -2866,9 +2884,20 @@ int main_app(int argc, char *argv[]) {
             result = compile_to_binary_fortran(opts.arg_file, outfile, compiler_options);
         } else if (backend == Backend::mlir) {
 #ifdef HAVE_LFORTRAN_MLIR
-            result = handle_mlir(opts.arg_file, outfile, compiler_options, false, false);
+            result = handle_mlir(opts.arg_file, outfile, compiler_options,
+                false, false, false, false);
 #else
             std::cerr << "The -c option with `--backend=mlir` requires the "
+                "MLIR backend to be enabled. Recompile with `WITH_MLIR=yes`."
+                << std::endl;
+            return 1;
+#endif
+        } else if (backend == Backend::mlir_new) {
+#ifdef HAVE_LFORTRAN_MLIR
+            result = handle_mlir(opts.arg_file, outfile, compiler_options,
+                false, false, false, true);
+#else
+            std::cerr << "The -c option with `--backend=mlir-new` requires the "
                 "MLIR backend to be enabled. Recompile with `WITH_MLIR=yes`."
                 << std::endl;
             return 1;
@@ -2926,10 +2955,21 @@ int main_app(int argc, char *argv[]) {
                         compiler_options.time_report, compiler_options);
             } else if (backend == Backend::mlir) {
 #ifdef HAVE_LFORTRAN_MLIR
-                err = handle_mlir(arg_file, tmp_o, compiler_options, false, false);
+                err = handle_mlir(arg_file, tmp_o, compiler_options,
+                    false, false, false, false);
 #else
                 std::cerr << "Compiling Fortran files to object files using "
                     "`--backend=mlir` requires the MLIR backend to be enabled. "
+                    "Recompile with `WITH_MLIR=yes`." << std::endl;
+                return 1;
+#endif
+            } else if (backend == Backend::mlir_new) {
+#ifdef HAVE_LFORTRAN_MLIR
+                err = handle_mlir(arg_file, tmp_o, compiler_options,
+                    false, false, false, true);
+#else
+                std::cerr << "Compiling Fortran files to object files using "
+                    "`--backend=mlir-new` requires the MLIR backend to be enabled. "
                     "Recompile with `WITH_MLIR=yes`." << std::endl;
                 return 1;
 #endif
