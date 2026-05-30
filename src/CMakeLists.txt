@@ -1,3 +1,6 @@
+if (WITH_LLVM AND WITH_MLIR)
+    add_subdirectory(mlir)
+endif()
 add_subdirectory(libasr)
 add_subdirectory(tests)
 add_subdirectory(lfortran)

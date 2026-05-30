@@ -94,7 +94,10 @@ if (WITH_LLVM)
         codegen/llvm_utils.cpp
     )
     if (WITH_MLIR)
-        set(SRC ${SRC} codegen/asr_to_mlir.cpp)
+        set(SRC ${SRC}
+            codegen/asr_to_mlir.cpp
+            codegen/asr_to_mlir_new.cpp
+        )
     endif()
     # We use deprecated API in LLVM, so we disable the warning until we upgrade
     if (NOT MSVC)
@@ -151,6 +154,9 @@ if (WITH_LLVM)
     if (EMSCRIPTEN)
         target_link_libraries(asr lldWasm lldCommon)
     endif()
+endif()
+if (WITH_MLIR)
+    target_link_libraries(asr lfortran_mlir_c_api)
 endif()
 
 # Install the dwarf_convert.py and dat_convert.py

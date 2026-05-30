@@ -277,6 +277,19 @@ if (WITH_LLVM)
         add_definitions("-DHAVE_TARGET_WASM=1")
     endif()
 
+    # mlir_api_impl_upstream.cpp may reference LLVMInitializeWebAssembly*.
+    if (WITH_MLIR AND NOT WITH_TARGET_WASM)
+        if ("${LLVM_TARGETS_TO_BUILD}" MATCHES "WebAssembly")
+            list(APPEND LFORTRAN_LLVM_COMPONENTS webassemblyasmparser webassemblycodegen webassemblydesc webassemblydisassembler webassemblyinfo)
+        else()
+            message(FATAL_ERROR
+                "WITH_MLIR requires an LLVM build that includes the WebAssembly "
+                "target (mlir_api_impl_upstream references LLVMInitializeWebAssembly*). "
+                "Configure LLVM with WebAssembly in LLVM_TARGETS_TO_BUILD, or set "
+                "WITH_TARGET_WASM=yes if your LLVM supports it.")
+        endif()
+    endif()
+
     if (TARGET LLVMCore)
         # If `LLVMCore` target is present, then LLVM is distributed as separate
         # libraries and llvm_map_components_to_libnames() should work:
@@ -293,15 +306,10 @@ if (WITH_LLVM)
     if (WITH_MLIR)
         add_library(p::mlir INTERFACE IMPORTED)
         find_package(MLIR REQUIRED CONFIG)
-        set(mlir_libs
-                MLIRIR
-                MLIRLLVMToLLVMIRTranslation
-                MLIRBuiltinToLLVMIRTranslation
-                MLIRLLVMDialect
-                MLIROpenMPToLLVMIRTranslation
-                MLIROpenMPDialect
-            )
-        set_property(TARGET p::mlir PROPERTY INTERFACE_LINK_LIBRARIES ${mlir_libs})
+        include(LFortranMLIRLink)
+        set_property(TARGET p::mlir PROPERTY INTERFACE_INCLUDE_DIRECTORIES
+            ${MLIR_INCLUDE_DIRS})
+        set_property(TARGET p::mlir PROPERTY INTERFACE_LINK_LIBRARIES ${LFORTRAN_MLIR_LINK_LIBS})
         set(HAVE_LFORTRAN_MLIR yes)
     endif()
 
