@@ -26,6 +26,7 @@
 #include <libasr/codegen/asr_to_llvm.h>
 #ifdef HAVE_LFORTRAN_MLIR
 #include <libasr/codegen/asr_to_mlir.h>
+#include <libasr/codegen/asr_to_mlir_new.h>
 #endif
 #else
 namespace LCompilers {
@@ -614,6 +615,32 @@ Result<std::unique_ptr<MLIRModule>> FortranEvaluator::get_mlir(
     }
 
     // MLIR -> LLVM
+    m->mlir_to_llvm(*m->llvm_ctx);
+    return m;
+#else
+    throw LCompilersException("MLIR is not enabled");
+#endif
+}
+
+Result<std::unique_ptr<MLIRModule>> FortranEvaluator::get_mlir_new(
+#ifdef HAVE_LFORTRAN_MLIR
+        ASR::asr_t &asr, diag::Diagnostics &diagnostics
+#else
+        ASR::asr_t &/*asr*/, diag::Diagnostics &/*diagnostics*/
+#endif
+) {
+#ifdef HAVE_LFORTRAN_MLIR
+    // Initial ASR only: no default ASR passes before mlir-new lowering.
+    std::unique_ptr<LCompilers::MLIRModule> m;
+    Result<std::unique_ptr<MLIRModule>> res = asr_to_mlir_new(al,
+        (ASR::asr_t &)asr, diagnostics);
+    if (res.ok) {
+        m = std::move(res.result);
+    } else {
+        LCOMPILERS_ASSERT(diagnostics.has_error())
+        return res.error;
+    }
+
     m->mlir_to_llvm(*m->llvm_ctx);
     return m;
 #else
