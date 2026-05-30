@@ -64,7 +64,7 @@ public:
         std::string llvm_ir_from_mlir);
     ~MLIRModule();
     std::string mlir_str();
-    std::string mlir_asr_dialect_dump() const;
+    std::string mlir_high_dialect_dump() const;
     std::string mlir_llvm_dialect_dump() const;
     std::string llvm_str();
     void mlir_to_llvm(llvm::LLVMContext &ctx);

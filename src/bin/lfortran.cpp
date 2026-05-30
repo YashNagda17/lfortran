@@ -1075,7 +1075,7 @@ int save_mod_files(const LCompilers::ASR::TranslationUnit_t &u,
 int handle_mlir(const std::string &infile,
         const std::string &outfile,
         CompilerOptions &compiler_options,
-        bool show_mlir_asr_dialect, bool show_mlir_llvm_dialect,
+        bool show_mlir_high_dialect, bool show_mlir_llvm_dialect,
         bool emit_mlir, bool emit_llvm,
         bool use_mlir_new) {
     std::string input = read_file_ok(infile);
@@ -1117,8 +1117,8 @@ int handle_mlir(const std::string &infile,
         LCOMPILERS_ASSERT(diagnostics.has_error())
         return 2;
     }
-    if (show_mlir_asr_dialect) {
-        std::cout << m->mlir_asr_dialect_dump();
+    if (show_mlir_high_dialect) {
+        std::cout << m->mlir_high_dialect_dump();
     } else if (show_mlir_llvm_dialect) {
         std::cout << m->mlir_llvm_dialect_dump();
     } else if (emit_mlir) {
@@ -2739,7 +2739,7 @@ int main_app(int argc, char *argv[]) {
         outfile = basename.replace_extension(".ll").string();
     } else if (opts.show_mlir && opts.arg_backend == "mlir-new") {
         outfile = basename.replace_extension(".mlir").string();
-    } else if (opts.show_mlir_asr_dialect || opts.show_mlir_llvm_dialect) {
+    } else if (opts.show_mlir_high_dialect || opts.show_mlir_llvm_dialect) {
         outfile = basename.replace_extension(".mlir").string();
     } else if (opts.show_mlir) {
         outfile = basename.replace_extension(".mlir").string();
@@ -2803,13 +2803,13 @@ int main_app(int argc, char *argv[]) {
         return 1;
 #endif
     }
-    if (opts.show_mlir || opts.show_mlir_asr_dialect || opts.show_mlir_llvm_dialect
+    if (opts.show_mlir || opts.show_mlir_high_dialect || opts.show_mlir_llvm_dialect
             || opts.show_llvm_from_mlir) {
 #ifdef HAVE_LFORTRAN_MLIR
         bool use_mlir_new = (opts.arg_backend == "mlir-new")
-            || opts.show_mlir_asr_dialect || opts.show_mlir_llvm_dialect;
+            || opts.show_mlir_high_dialect || opts.show_mlir_llvm_dialect;
         return handle_mlir(opts.arg_file, outfile, compiler_options,
-            opts.show_mlir_asr_dialect, opts.show_mlir_llvm_dialect,
+            opts.show_mlir_high_dialect, opts.show_mlir_llvm_dialect,
             opts.show_mlir, opts.show_llvm_from_mlir,
             use_mlir_new);
 #else

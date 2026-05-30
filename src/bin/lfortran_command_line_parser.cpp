@@ -302,9 +302,11 @@ namespace LCompilers::CommandLineInterface {
         app.add_flag("--show-mlir", opts.show_mlir,
             "Show MLIR for the given file and exit; with `--backend=mlir-new` "
             "shows high-level MLIR (func/memref/arith) before lowering")->group(group_output_debugging_options);
-        app.add_flag("--show-mlir-asr-dialect", opts.show_mlir_asr_dialect,
+        app.add_flag("--show-mlir-high-dialect", opts.show_mlir_high_dialect,
             "Show high-level MLIR from `--backend=mlir-new` and exit; "
             "implies mlir-new pipeline when set alone")->group(group_output_debugging_options);
+        app.add_flag("--show-mlir-asr-dialect", opts.show_mlir_asr_dialect,
+            "Deprecated; no effect (use --show-mlir-high-dialect)")->group(group_output_debugging_options);
         app.add_flag("--show-mlir-llvm-dialect", opts.show_mlir_llvm_dialect,
             "Show LLVM-dialect MLIR emitted by `--backend=mlir-new` and exit; "
             "implies mlir-new pipeline when set alone")->group(group_output_debugging_options);

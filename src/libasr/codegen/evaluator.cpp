@@ -186,7 +186,7 @@ std::string MLIRModule::mlir_str() {
     return mlir_str;
 }
 
-std::string MLIRModule::mlir_asr_dialect_dump() const {
+std::string MLIRModule::mlir_high_dialect_dump() const {
     if (!mlir_high_dialect_str.empty()) {
         return mlir_high_dialect_str;
     }

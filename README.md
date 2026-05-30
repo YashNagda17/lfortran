@@ -69,7 +69,7 @@ See also [`../../mlir_build.txt`](../../mlir_build.txt).
 |---------|--------|
 | `--backend=mlir-new` | Full pipeline; compile / link |
 | `--show-mlir` | High-level MLIR (`func`/`memref`/`arith`) |
-| `--show-mlir-asr-dialect` | Same as `--show-mlir` for mlir-new |
+| `--show-mlir-high-dialect` | High-level MLIR before LLVM-dialect lowering |
 | `--show-mlir-llvm-dialect` | MLIR after lowering to LLVM dialect |
 | `--show-llvm-from-mlir` | LLVM IR text |
 | `-c -o file.o` | Object file |
@@ -79,6 +79,7 @@ Examples:
 ```bash
 lfortran program.f90 --backend=mlir-new
 lfortran program.f90 --backend=mlir-new --show-mlir
+lfortran program.f90 --backend=mlir-new --show-mlir-high-dialect
 lfortran program.f90 --backend=mlir-new --show-mlir-llvm-dialect
 lfortran program.f90 --backend=mlir-new --show-llvm-from-mlir
 lfortran -c program.f90 -o program.o --backend=mlir-new
@@ -107,6 +108,7 @@ USE_MLIR_Upstream=1 lfortran program.f90 --backend=mlir-new --show-llvm-from-mli
 
 ```bash
 lfortran --backend=mlir-new --show-mlir a.f90
+lfortran --backend=mlir-new --show-mlir-high-dialect a.f90
 lfortran --backend=mlir-new --show-mlir-llvm-dialect a.f90
 USE_MLIR_Upstream=0 lfortran --backend=mlir-new --show-llvm-from-mlir a.f90
 lfortran --backend=mlir-new -c a.f90 -o a.o
