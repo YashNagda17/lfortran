@@ -2803,7 +2803,8 @@ int main_app(int argc, char *argv[]) {
         return 1;
 #endif
     }
-    if (opts.show_mlir || opts.show_mlir_llvm_dialect || opts.show_llvm_from_mlir) {
+    if (opts.show_mlir || opts.show_mlir_asr_dialect || opts.show_mlir_llvm_dialect
+            || opts.show_llvm_from_mlir) {
 #ifdef HAVE_LFORTRAN_MLIR
         bool use_mlir_new = (opts.arg_backend == "mlir-new")
             || opts.show_mlir_asr_dialect || opts.show_mlir_llvm_dialect;
