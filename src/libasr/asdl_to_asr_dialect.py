@@ -150,7 +150,12 @@ def gen_field_assign(i: int, f: asdl.Field, param: str) -> list[str]:
         lines.append(f"    fields[{i}].value.i64 = {param};")
     elif f.type == "ttype":
         lines.append(f"    fields[{i}].value.type = {param};")
-    elif f.seq and fk in ("ASR_FIELD_OP_SEQ", "ASR_FIELD_NODE_SEQ"):
+    elif f.seq and fk in (
+        "ASR_FIELD_OP_SEQ",
+        "ASR_FIELD_NODE_SEQ",
+        "ASR_FIELD_EXPR_SEQ",
+        "ASR_FIELD_STMT_SEQ",
+    ):
         lines.append(
             f"    fields[{i}].value.op = (MLIR_OpHandle)(uintptr_t){param};")
     else:
@@ -316,7 +321,10 @@ def gen_api_generated_h(ops: list[dict]) -> str:
         params = ["MLIR_Context *ctx", "MLIR_LocationHandle loc"]
         for f in stored:
             fname = c_param_name(f.name or f.type)
-            if f.type in ("expr", "stmt", "node"):
+            if f.seq and f.type in ("expr", "stmt", "node"):
+                params.append(f"MLIR_OpHandle *{fname}")
+                params.append(f"size_t n_{fname}")
+            elif f.type in ("expr", "stmt", "node"):
                 params.append(f"MLIR_OpHandle {fname}")
             elif f.type == "symbol":
                 params.append(f"string {fname}")
@@ -407,14 +415,16 @@ def cpp_emit_field(field: asdl.Field) -> str:
         if field.seq:
             count = asr_count_member(field)
             return (f"        size_t n_{fname} = x.{count};\n"
-                    f"        MLIR_ValueHandle {fname} = emit_expr_seq_value(x.{member}, n_{fname});")
+                    f"        MLIR_OpHandle *{fname} = emit_expr_op_array(x.{member}, n_{fname});")
         if field.opt:
             return (f"        MLIR_ValueHandle {fname} = MLIR_INVALID_HANDLE;\n"
                     f"        if (x.{member}) {{ {fname} = emit_expr(*x.{member}); }}")
         return f"        MLIR_ValueHandle {fname} = emit_expr(*x.{member});"
     if asdl_type == "stmt":
         if field.seq:
-            return f"        MLIR_ValueHandle {fname} = emit_stmt_seq_value(x.{member}, x.{asr_count_member(field)});"
+            count = asr_count_member(field)
+            return (f"        size_t n_{fname} = x.{count};\n"
+                    f"        MLIR_OpHandle *{fname} = emit_stmt_op_array(x.{member}, n_{fname});")
         if field.opt:
             return (f"        MLIR_ValueHandle {fname} = MLIR_INVALID_HANDLE;\n"
                     f"        if (x.{member}) {{ {fname} = emit_stmt(*x.{member}); }}")
@@ -453,6 +463,14 @@ def cpp_emit_field(field: asdl.Field) -> str:
         return f"        int64_t {fname} = (int64_t)x.{member};"
     if is_enum_field(asdl_type):
         return f"        int64_t {fname} = (int64_t)x.{member};"
+    if asdl_type == "array_index" and field.seq:
+        count = asr_count_member(field)
+        return (f"        size_t n_{fname} = x.{count};\n"
+                f"        MLIR_OpHandle *{fname} = emit_array_index_op_array(x.{member}, n_{fname});")
+    if field.seq and field_kind(asdl_type, True, field.opt) == "ASR_FIELD_OP_SEQ":
+        count = asr_count_member(field)
+        return (f"        size_t n_{fname} = x.{count};\n"
+                f"        MLIR_OpHandle *{fname} = emit_product_op_array(x.{member}, n_{fname});")
     if field.seq:
         count = asr_count_member(field)
         return (f"        size_t n_{fname} = x.{count};\n"
@@ -473,6 +491,7 @@ def cpp_emit_field(field: asdl.Field) -> str:
 # Hand-written in asr_to_asr_dialect.cpp (module layout + multi-stmt do bodies).
 SKIP_VISITOR_OPS = {
     "Program", "TranslationUnit", "DoLoop", "Print", "FileWrite", "Variable",
+    "StringFormat",
 }
 
 # Embedded ASR products emitted by helpers in asr_to_asr_dialect.cpp.
@@ -489,8 +508,13 @@ def visitor_create_args(fields: list[asdl.Field]) -> list[str]:
         fname = c_param_name(f.name or f.type)
         fk = field_kind(f.type, f.seq, f.opt)
         # Product/node sequences use MLIR_OpHandle* + count in generated API.
-        if f.seq and fk in ("ASR_FIELD_OP_SEQ", "ASR_FIELD_NODE_SEQ"):
-            args.append("nullptr")
+        if f.seq and fk in (
+            "ASR_FIELD_OP_SEQ",
+            "ASR_FIELD_NODE_SEQ",
+            "ASR_FIELD_EXPR_SEQ",
+            "ASR_FIELD_STMT_SEQ",
+        ):
+            args.append(fname)
             args.append(f"n_{fname}")
             continue
         args.append(fname)

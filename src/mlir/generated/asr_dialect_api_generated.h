@@ -92,16 +92,18 @@ static inline MLIR_OpHandle ASR_Createcall_argOp(
 static inline MLIR_OpHandle ASR_CreateCaseStmtOp(
         MLIR_Context *ctx,
         MLIR_LocationHandle loc,
-        MLIR_OpHandle test,
-        MLIR_OpHandle body,
+        MLIR_OpHandle *test,
+        size_t n_test,
+        MLIR_OpHandle *body,
+        size_t n_body,
         bool fall_through) {
     ASR_DialectField fields[3];
     fields[0].kind = ASR_FIELD_EXPR_SEQ;
     fields[0].name = "test";
-    fields[0].value.op = test;
+    fields[0].value.op = (MLIR_OpHandle)(uintptr_t)test;
     fields[1].kind = ASR_FIELD_STMT_SEQ;
     fields[1].name = "body";
-    fields[1].value.op = body;
+    fields[1].value.op = (MLIR_OpHandle)(uintptr_t)body;
     fields[2].kind = ASR_FIELD_BOOL;
     fields[2].name = "fall_through";
     fields[2].value.b = fall_through;
@@ -113,7 +115,8 @@ static inline MLIR_OpHandle ASR_CreateCaseStmt_RangeOp(
         MLIR_LocationHandle loc,
         MLIR_OpHandle start,
         MLIR_OpHandle end,
-        MLIR_OpHandle body) {
+        MLIR_OpHandle *body,
+        size_t n_body) {
     ASR_DialectField fields[3];
     fields[0].kind = ASR_FIELD_EXPR_OPT;
     fields[0].name = "start";
@@ -123,7 +126,7 @@ static inline MLIR_OpHandle ASR_CreateCaseStmt_RangeOp(
     fields[1].value.op = end;
     fields[2].kind = ASR_FIELD_STMT_SEQ;
     fields[2].name = "body";
-    fields[2].value.op = body;
+    fields[2].value.op = (MLIR_OpHandle)(uintptr_t)body;
     return ASR_DialectCreateOp(ctx, ASR_DIALECT_OP_CASE_STMT_CASESTMT_RANGE, loc, fields, 3);
 }
 
@@ -260,7 +263,8 @@ static inline MLIR_OpHandle ASR_CreateArrayConstantOp(
 static inline MLIR_OpHandle ASR_CreateArrayConstructorOp(
         MLIR_Context *ctx,
         MLIR_LocationHandle loc,
-        MLIR_OpHandle args,
+        MLIR_OpHandle *args,
+        size_t n_args,
         MLIR_TypeHandle type,
         MLIR_OpHandle value,
         int64_t storage_format,
@@ -268,7 +272,7 @@ static inline MLIR_OpHandle ASR_CreateArrayConstructorOp(
     ASR_DialectField fields[5];
     fields[0].kind = ASR_FIELD_EXPR_SEQ;
     fields[0].name = "args";
-    fields[0].value.op = args;
+    fields[0].value.op = (MLIR_OpHandle)(uintptr_t)args;
     fields[1].kind = ASR_FIELD_TTYPE;
     fields[1].name = "type";
     fields[1].value.type = type;
@@ -796,16 +800,18 @@ static inline MLIR_OpHandle ASR_CreateComplexUnaryMinusOp(
 static inline MLIR_OpHandle ASR_CreateDictConstantOp(
         MLIR_Context *ctx,
         MLIR_LocationHandle loc,
-        MLIR_OpHandle keys,
-        MLIR_OpHandle values,
+        MLIR_OpHandle *keys,
+        size_t n_keys,
+        MLIR_OpHandle *values,
+        size_t n_values,
         MLIR_TypeHandle type) {
     ASR_DialectField fields[3];
     fields[0].kind = ASR_FIELD_EXPR_SEQ;
     fields[0].name = "keys";
-    fields[0].value.op = keys;
+    fields[0].value.op = (MLIR_OpHandle)(uintptr_t)keys;
     fields[1].kind = ASR_FIELD_EXPR_SEQ;
     fields[1].name = "values";
-    fields[1].value.op = values;
+    fields[1].value.op = (MLIR_OpHandle)(uintptr_t)values;
     fields[2].kind = ASR_FIELD_TTYPE;
     fields[2].name = "type";
     fields[2].value.type = type;
@@ -908,7 +914,8 @@ static inline MLIR_OpHandle ASR_CreateEnumConstructorOp(
         MLIR_Context *ctx,
         MLIR_LocationHandle loc,
         string dt_sym,
-        MLIR_OpHandle args,
+        MLIR_OpHandle *args,
+        size_t n_args,
         MLIR_TypeHandle type,
         MLIR_OpHandle value) {
     ASR_DialectField fields[4];
@@ -917,7 +924,7 @@ static inline MLIR_OpHandle ASR_CreateEnumConstructorOp(
     fields[0].value.str = dt_sym;
     fields[1].kind = ASR_FIELD_EXPR_SEQ;
     fields[1].name = "args";
-    fields[1].value.op = args;
+    fields[1].value.op = (MLIR_OpHandle)(uintptr_t)args;
     fields[2].kind = ASR_FIELD_TTYPE;
     fields[2].name = "type";
     fields[2].value.type = type;
@@ -1191,7 +1198,8 @@ static inline MLIR_OpHandle ASR_CreateIfExpOp(
 static inline MLIR_OpHandle ASR_CreateImpliedDoLoopOp(
         MLIR_Context *ctx,
         MLIR_LocationHandle loc,
-        MLIR_OpHandle values,
+        MLIR_OpHandle *values,
+        size_t n_values,
         MLIR_OpHandle var,
         MLIR_OpHandle start,
         MLIR_OpHandle end,
@@ -1201,7 +1209,7 @@ static inline MLIR_OpHandle ASR_CreateImpliedDoLoopOp(
     ASR_DialectField fields[7];
     fields[0].kind = ASR_FIELD_EXPR_SEQ;
     fields[0].name = "values";
-    fields[0].value.op = values;
+    fields[0].value.op = (MLIR_OpHandle)(uintptr_t)values;
     fields[1].kind = ASR_FIELD_EXPR;
     fields[1].name = "var";
     fields[1].value.op = var;
@@ -1357,7 +1365,8 @@ static inline MLIR_OpHandle ASR_CreateIntrinsicArrayFunctionOp(
         MLIR_Context *ctx,
         MLIR_LocationHandle loc,
         int64_t arr_intrinsic_id,
-        MLIR_OpHandle args,
+        MLIR_OpHandle *args,
+        size_t n_args,
         int64_t overload_id,
         MLIR_TypeHandle type,
         MLIR_OpHandle value) {
@@ -1367,7 +1376,7 @@ static inline MLIR_OpHandle ASR_CreateIntrinsicArrayFunctionOp(
     fields[0].value.i64 = arr_intrinsic_id;
     fields[1].kind = ASR_FIELD_EXPR_SEQ;
     fields[1].name = "args";
-    fields[1].value.op = args;
+    fields[1].value.op = (MLIR_OpHandle)(uintptr_t)args;
     fields[2].kind = ASR_FIELD_I64;
     fields[2].name = "overload_id";
     fields[2].value.i64 = overload_id;
@@ -1384,7 +1393,8 @@ static inline MLIR_OpHandle ASR_CreateIntrinsicElementalFunctionOp(
         MLIR_Context *ctx,
         MLIR_LocationHandle loc,
         int64_t intrinsic_id,
-        MLIR_OpHandle args,
+        MLIR_OpHandle *args,
+        size_t n_args,
         int64_t overload_id,
         MLIR_TypeHandle type,
         MLIR_OpHandle value) {
@@ -1394,7 +1404,7 @@ static inline MLIR_OpHandle ASR_CreateIntrinsicElementalFunctionOp(
     fields[0].value.i64 = intrinsic_id;
     fields[1].kind = ASR_FIELD_EXPR_SEQ;
     fields[1].name = "args";
-    fields[1].value.op = args;
+    fields[1].value.op = (MLIR_OpHandle)(uintptr_t)args;
     fields[2].kind = ASR_FIELD_I64;
     fields[2].name = "overload_id";
     fields[2].value.i64 = overload_id;
@@ -1411,7 +1421,8 @@ static inline MLIR_OpHandle ASR_CreateIntrinsicImpureFunctionOp(
         MLIR_Context *ctx,
         MLIR_LocationHandle loc,
         int64_t impure_intrinsic_id,
-        MLIR_OpHandle args,
+        MLIR_OpHandle *args,
+        size_t n_args,
         int64_t overload_id,
         MLIR_TypeHandle type,
         MLIR_OpHandle value) {
@@ -1421,7 +1432,7 @@ static inline MLIR_OpHandle ASR_CreateIntrinsicImpureFunctionOp(
     fields[0].value.i64 = impure_intrinsic_id;
     fields[1].kind = ASR_FIELD_EXPR_SEQ;
     fields[1].name = "args";
-    fields[1].value.op = args;
+    fields[1].value.op = (MLIR_OpHandle)(uintptr_t)args;
     fields[2].kind = ASR_FIELD_I64;
     fields[2].name = "overload_id";
     fields[2].value.i64 = overload_id;
@@ -1487,12 +1498,13 @@ static inline MLIR_OpHandle ASR_CreateListConcatOp(
 static inline MLIR_OpHandle ASR_CreateListConstantOp(
         MLIR_Context *ctx,
         MLIR_LocationHandle loc,
-        MLIR_OpHandle args,
+        MLIR_OpHandle *args,
+        size_t n_args,
         MLIR_TypeHandle type) {
     ASR_DialectField fields[2];
     fields[0].kind = ASR_FIELD_EXPR_SEQ;
     fields[0].name = "args";
-    fields[0].value.op = args;
+    fields[0].value.op = (MLIR_OpHandle)(uintptr_t)args;
     fields[1].kind = ASR_FIELD_TTYPE;
     fields[1].name = "type";
     fields[1].value.type = type;
@@ -2073,12 +2085,13 @@ static inline MLIR_OpHandle ASR_CreateRealUnaryMinusOp(
 static inline MLIR_OpHandle ASR_CreateSetConstantOp(
         MLIR_Context *ctx,
         MLIR_LocationHandle loc,
-        MLIR_OpHandle elements,
+        MLIR_OpHandle *elements,
+        size_t n_elements,
         MLIR_TypeHandle type) {
     ASR_DialectField fields[2];
     fields[0].kind = ASR_FIELD_EXPR_SEQ;
     fields[0].name = "elements";
-    fields[0].value.op = elements;
+    fields[0].value.op = (MLIR_OpHandle)(uintptr_t)elements;
     fields[1].kind = ASR_FIELD_TTYPE;
     fields[1].name = "type";
     fields[1].value.type = type;
@@ -2276,7 +2289,8 @@ static inline MLIR_OpHandle ASR_CreateStringFormatOp(
         MLIR_Context *ctx,
         MLIR_LocationHandle loc,
         MLIR_OpHandle fmt,
-        MLIR_OpHandle args,
+        MLIR_OpHandle *args,
+        size_t n_args,
         int64_t kind,
         MLIR_TypeHandle type,
         MLIR_OpHandle value) {
@@ -2286,7 +2300,7 @@ static inline MLIR_OpHandle ASR_CreateStringFormatOp(
     fields[0].value.op = fmt;
     fields[1].kind = ASR_FIELD_EXPR_SEQ;
     fields[1].name = "args";
-    fields[1].value.op = args;
+    fields[1].value.op = (MLIR_OpHandle)(uintptr_t)args;
     fields[2].kind = ASR_FIELD_I64;
     fields[2].name = "kind";
     fields[2].value.i64 = kind;
@@ -2611,12 +2625,13 @@ static inline MLIR_OpHandle ASR_CreateTupleConcatOp(
 static inline MLIR_OpHandle ASR_CreateTupleConstantOp(
         MLIR_Context *ctx,
         MLIR_LocationHandle loc,
-        MLIR_OpHandle elements,
+        MLIR_OpHandle *elements,
+        size_t n_elements,
         MLIR_TypeHandle type) {
     ASR_DialectField fields[2];
     fields[0].kind = ASR_FIELD_EXPR_SEQ;
     fields[0].name = "elements";
-    fields[0].value.op = elements;
+    fields[0].value.op = (MLIR_OpHandle)(uintptr_t)elements;
     fields[1].kind = ASR_FIELD_TTYPE;
     fields[1].name = "type";
     fields[1].value.type = type;
@@ -2719,7 +2734,8 @@ static inline MLIR_OpHandle ASR_CreateUnionConstructorOp(
         MLIR_Context *ctx,
         MLIR_LocationHandle loc,
         string dt_sym,
-        MLIR_OpHandle args,
+        MLIR_OpHandle *args,
+        size_t n_args,
         MLIR_TypeHandle type,
         MLIR_OpHandle value) {
     ASR_DialectField fields[4];
@@ -2728,7 +2744,7 @@ static inline MLIR_OpHandle ASR_CreateUnionConstructorOp(
     fields[0].value.str = dt_sym;
     fields[1].kind = ASR_FIELD_EXPR_SEQ;
     fields[1].name = "args";
-    fields[1].value.op = args;
+    fields[1].value.op = (MLIR_OpHandle)(uintptr_t)args;
     fields[2].kind = ASR_FIELD_TTYPE;
     fields[2].name = "type";
     fields[2].value.type = type;
@@ -2904,11 +2920,12 @@ static inline MLIR_OpHandle ASR_CreateOMPDeviceOp(
 static inline MLIR_OpHandle ASR_CreateOMPFirstPrivateOp(
         MLIR_Context *ctx,
         MLIR_LocationHandle loc,
-        MLIR_OpHandle vars) {
+        MLIR_OpHandle *vars,
+        size_t n_vars) {
     ASR_DialectField fields[1];
     fields[0].kind = ASR_FIELD_EXPR_SEQ;
     fields[0].name = "vars";
-    fields[0].value.op = vars;
+    fields[0].value.op = (MLIR_OpHandle)(uintptr_t)vars;
     return ASR_DialectCreateOp(ctx, ASR_DIALECT_OP_OMP_CLAUSE_OMPFIRSTPRIVATE, loc, fields, 1);
 }
 
@@ -2926,11 +2943,12 @@ static inline MLIR_OpHandle ASR_CreateOMPIfOp(
 static inline MLIR_OpHandle ASR_CreateOMPLastPrivateOp(
         MLIR_Context *ctx,
         MLIR_LocationHandle loc,
-        MLIR_OpHandle vars) {
+        MLIR_OpHandle *vars,
+        size_t n_vars) {
     ASR_DialectField fields[1];
     fields[0].kind = ASR_FIELD_EXPR_SEQ;
     fields[0].name = "vars";
-    fields[0].value.op = vars;
+    fields[0].value.op = (MLIR_OpHandle)(uintptr_t)vars;
     return ASR_DialectCreateOp(ctx, ASR_DIALECT_OP_OMP_CLAUSE_OMPLASTPRIVATE, loc, fields, 1);
 }
 
@@ -2938,14 +2956,15 @@ static inline MLIR_OpHandle ASR_CreateOMPMapOp(
         MLIR_Context *ctx,
         MLIR_LocationHandle loc,
         int64_t type,
-        MLIR_OpHandle vars) {
+        MLIR_OpHandle *vars,
+        size_t n_vars) {
     ASR_DialectField fields[2];
     fields[0].kind = ASR_FIELD_I64;
     fields[0].name = "type";
     fields[0].value.i64 = type;
     fields[1].kind = ASR_FIELD_EXPR_SEQ;
     fields[1].name = "vars";
-    fields[1].value.op = vars;
+    fields[1].value.op = (MLIR_OpHandle)(uintptr_t)vars;
     return ASR_DialectCreateOp(ctx, ASR_DIALECT_OP_OMP_CLAUSE_OMPMAP, loc, fields, 2);
 }
 
@@ -2981,11 +3000,12 @@ static inline MLIR_OpHandle ASR_CreateOMPNumThreadsOp(
 static inline MLIR_OpHandle ASR_CreateOMPPrivateOp(
         MLIR_Context *ctx,
         MLIR_LocationHandle loc,
-        MLIR_OpHandle vars) {
+        MLIR_OpHandle *vars,
+        size_t n_vars) {
     ASR_DialectField fields[1];
     fields[0].kind = ASR_FIELD_EXPR_SEQ;
     fields[0].name = "vars";
-    fields[0].value.op = vars;
+    fields[0].value.op = (MLIR_OpHandle)(uintptr_t)vars;
     return ASR_DialectCreateOp(ctx, ASR_DIALECT_OP_OMP_CLAUSE_OMPPRIVATE, loc, fields, 1);
 }
 
@@ -2993,14 +3013,15 @@ static inline MLIR_OpHandle ASR_CreateOMPReductionOp(
         MLIR_Context *ctx,
         MLIR_LocationHandle loc,
         int64_t operator_,
-        MLIR_OpHandle vars) {
+        MLIR_OpHandle *vars,
+        size_t n_vars) {
     ASR_DialectField fields[2];
     fields[0].kind = ASR_FIELD_I64;
     fields[0].name = "operator";
     fields[0].value.i64 = operator_;
     fields[1].kind = ASR_FIELD_EXPR_SEQ;
     fields[1].name = "vars";
-    fields[1].value.op = vars;
+    fields[1].value.op = (MLIR_OpHandle)(uintptr_t)vars;
     return ASR_DialectCreateOp(ctx, ASR_DIALECT_OP_OMP_CLAUSE_OMPREDUCTION, loc, fields, 2);
 }
 
@@ -3022,11 +3043,12 @@ static inline MLIR_OpHandle ASR_CreateOMPScheduleOp(
 static inline MLIR_OpHandle ASR_CreateOMPSharedOp(
         MLIR_Context *ctx,
         MLIR_LocationHandle loc,
-        MLIR_OpHandle vars) {
+        MLIR_OpHandle *vars,
+        size_t n_vars) {
     ASR_DialectField fields[1];
     fields[0].kind = ASR_FIELD_EXPR_SEQ;
     fields[0].name = "vars";
-    fields[0].value.op = vars;
+    fields[0].value.op = (MLIR_OpHandle)(uintptr_t)vars;
     return ASR_DialectCreateOp(ctx, ASR_DIALECT_OP_OMP_CLAUSE_OMPSHARED, loc, fields, 1);
 }
 
@@ -3045,14 +3067,15 @@ static inline MLIR_OpHandle ASR_CreateRankExprOp(
         MLIR_Context *ctx,
         MLIR_LocationHandle loc,
         MLIR_OpHandle rank,
-        MLIR_OpHandle body) {
+        MLIR_OpHandle *body,
+        size_t n_body) {
     ASR_DialectField fields[2];
     fields[0].kind = ASR_FIELD_EXPR;
     fields[0].name = "rank";
     fields[0].value.op = rank;
     fields[1].kind = ASR_FIELD_STMT_SEQ;
     fields[1].name = "body";
-    fields[1].value.op = body;
+    fields[1].value.op = (MLIR_OpHandle)(uintptr_t)body;
     return ASR_DialectCreateOp(ctx, ASR_DIALECT_OP_RANK_STMT_RANKEXPR, loc, fields, 2);
 }
 
@@ -3246,7 +3269,8 @@ static inline MLIR_OpHandle ASR_CreateDebugCheckArrayBoundsOp(
         MLIR_Context *ctx,
         MLIR_LocationHandle loc,
         MLIR_OpHandle target,
-        MLIR_OpHandle components,
+        MLIR_OpHandle *components,
+        size_t n_components,
         bool move_allocation) {
     ASR_DialectField fields[3];
     fields[0].kind = ASR_FIELD_EXPR;
@@ -3254,7 +3278,7 @@ static inline MLIR_OpHandle ASR_CreateDebugCheckArrayBoundsOp(
     fields[0].value.op = target;
     fields[1].kind = ASR_FIELD_EXPR_SEQ;
     fields[1].name = "components";
-    fields[1].value.op = components;
+    fields[1].value.op = (MLIR_OpHandle)(uintptr_t)components;
     fields[2].kind = ASR_FIELD_BOOL;
     fields[2].name = "move_allocation";
     fields[2].value.b = move_allocation;
@@ -3296,27 +3320,30 @@ static inline MLIR_OpHandle ASR_CreateDoConcurrentLoopOp(
         MLIR_LocationHandle loc,
         MLIR_OpHandle *head,
         size_t n_head,
-        MLIR_OpHandle shared,
-        MLIR_OpHandle local,
+        MLIR_OpHandle *shared,
+        size_t n_shared,
+        MLIR_OpHandle *local,
+        size_t n_local,
         MLIR_OpHandle *reduction,
         size_t n_reduction,
-        MLIR_OpHandle body) {
+        MLIR_OpHandle *body,
+        size_t n_body) {
     ASR_DialectField fields[5];
     fields[0].kind = ASR_FIELD_OP_SEQ;
     fields[0].name = "head";
     fields[0].value.op = (MLIR_OpHandle)(uintptr_t)head;
     fields[1].kind = ASR_FIELD_EXPR_SEQ;
     fields[1].name = "shared";
-    fields[1].value.op = shared;
+    fields[1].value.op = (MLIR_OpHandle)(uintptr_t)shared;
     fields[2].kind = ASR_FIELD_EXPR_SEQ;
     fields[2].name = "local";
-    fields[2].value.op = local;
+    fields[2].value.op = (MLIR_OpHandle)(uintptr_t)local;
     fields[3].kind = ASR_FIELD_OP_SEQ;
     fields[3].name = "reduction";
     fields[3].value.op = (MLIR_OpHandle)(uintptr_t)reduction;
     fields[4].kind = ASR_FIELD_STMT_SEQ;
     fields[4].name = "body";
-    fields[4].value.op = body;
+    fields[4].value.op = (MLIR_OpHandle)(uintptr_t)body;
     return ASR_DialectCreateOp(ctx, ASR_DIALECT_OP_STMT_DOCONCURRENTLOOP, loc, fields, 5);
 }
 
@@ -3325,8 +3352,10 @@ static inline MLIR_OpHandle ASR_CreateDoLoopOp(
         MLIR_LocationHandle loc,
         string name,
         MLIR_OpHandle head,
-        MLIR_OpHandle body,
-        MLIR_OpHandle orelse) {
+        MLIR_OpHandle *body,
+        size_t n_body,
+        MLIR_OpHandle *orelse,
+        size_t n_orelse) {
     ASR_DialectField fields[4];
     fields[0].kind = ASR_FIELD_IDENTIFIER_OPT;
     fields[0].name = "name";
@@ -3336,10 +3365,10 @@ static inline MLIR_OpHandle ASR_CreateDoLoopOp(
     fields[1].value.op = head;
     fields[2].kind = ASR_FIELD_STMT_SEQ;
     fields[2].name = "body";
-    fields[2].value.op = body;
+    fields[2].value.op = (MLIR_OpHandle)(uintptr_t)body;
     fields[3].kind = ASR_FIELD_STMT_SEQ;
     fields[3].name = "orelse";
-    fields[3].value.op = orelse;
+    fields[3].value.op = (MLIR_OpHandle)(uintptr_t)orelse;
     return ASR_DialectCreateOp(ctx, ASR_DIALECT_OP_STMT_DOLOOP, loc, fields, 4);
 }
 
@@ -3368,11 +3397,12 @@ static inline MLIR_OpHandle ASR_CreateExitOp(
 static inline MLIR_OpHandle ASR_CreateExplicitDeallocateOp(
         MLIR_Context *ctx,
         MLIR_LocationHandle loc,
-        MLIR_OpHandle vars) {
+        MLIR_OpHandle *vars,
+        size_t n_vars) {
     ASR_DialectField fields[1];
     fields[0].kind = ASR_FIELD_EXPR_SEQ;
     fields[0].name = "vars";
-    fields[0].value.op = vars;
+    fields[0].value.op = (MLIR_OpHandle)(uintptr_t)vars;
     return ASR_DialectCreateOp(ctx, ASR_DIALECT_OP_STMT_EXPLICITDEALLOCATE, loc, fields, 1);
 }
 
@@ -3500,7 +3530,8 @@ static inline MLIR_OpHandle ASR_CreateFileInquireOp(
         MLIR_OpHandle size,
         MLIR_OpHandle pos,
         MLIR_OpHandle iolength,
-        MLIR_OpHandle iolength_vars,
+        MLIR_OpHandle *iolength_vars,
+        size_t n_iolength_vars,
         MLIR_OpHandle decimal,
         MLIR_OpHandle sign,
         MLIR_OpHandle encoding,
@@ -3611,7 +3642,7 @@ static inline MLIR_OpHandle ASR_CreateFileInquireOp(
     fields[32].value.op = iolength;
     fields[33].kind = ASR_FIELD_EXPR_SEQ;
     fields[33].name = "iolength_vars";
-    fields[33].value.op = iolength_vars;
+    fields[33].value.op = (MLIR_OpHandle)(uintptr_t)iolength_vars;
     fields[34].kind = ASR_FIELD_EXPR_OPT;
     fields[34].name = "decimal";
     fields[34].value.op = decimal;
@@ -3734,7 +3765,8 @@ static inline MLIR_OpHandle ASR_CreateFileReadOp(
         MLIR_OpHandle size,
         MLIR_OpHandle id,
         MLIR_OpHandle pos,
-        MLIR_OpHandle values,
+        MLIR_OpHandle *values,
+        size_t n_values,
         MLIR_OpHandle overloaded,
         bool is_formatted,
         string nml,
@@ -3770,7 +3802,7 @@ static inline MLIR_OpHandle ASR_CreateFileReadOp(
     fields[8].value.op = pos;
     fields[9].kind = ASR_FIELD_EXPR_SEQ;
     fields[9].name = "values";
-    fields[9].value.op = values;
+    fields[9].value.op = (MLIR_OpHandle)(uintptr_t)values;
     fields[10].kind = ASR_FIELD_STMT_OPT;
     fields[10].name = "overloaded";
     fields[10].value.op = overloaded;
@@ -3824,7 +3856,8 @@ static inline MLIR_OpHandle ASR_CreateFileWriteOp(
         MLIR_OpHandle iomsg,
         MLIR_OpHandle iostat,
         MLIR_OpHandle id,
-        MLIR_OpHandle values,
+        MLIR_OpHandle *values,
+        size_t n_values,
         MLIR_OpHandle separator,
         MLIR_OpHandle end,
         MLIR_OpHandle overloaded,
@@ -3851,7 +3884,7 @@ static inline MLIR_OpHandle ASR_CreateFileWriteOp(
     fields[4].value.op = id;
     fields[5].kind = ASR_FIELD_EXPR_SEQ;
     fields[5].name = "values";
-    fields[5].value.op = values;
+    fields[5].value.op = (MLIR_OpHandle)(uintptr_t)values;
     fields[6].kind = ASR_FIELD_EXPR_OPT;
     fields[6].name = "separator";
     fields[6].value.op = separator;
@@ -3926,7 +3959,8 @@ static inline MLIR_OpHandle ASR_CreateForEachOp(
         MLIR_LocationHandle loc,
         MLIR_OpHandle var,
         MLIR_OpHandle container,
-        MLIR_OpHandle body) {
+        MLIR_OpHandle *body,
+        size_t n_body) {
     ASR_DialectField fields[3];
     fields[0].kind = ASR_FIELD_EXPR;
     fields[0].name = "var";
@@ -3936,7 +3970,7 @@ static inline MLIR_OpHandle ASR_CreateForEachOp(
     fields[1].value.op = container;
     fields[2].kind = ASR_FIELD_STMT_SEQ;
     fields[2].name = "body";
-    fields[2].value.op = body;
+    fields[2].value.op = (MLIR_OpHandle)(uintptr_t)body;
     return ASR_DialectCreateOp(ctx, ASR_DIALECT_OP_STMT_FOREACH, loc, fields, 3);
 }
 
@@ -4006,8 +4040,10 @@ static inline MLIR_OpHandle ASR_CreateIfOp(
         MLIR_LocationHandle loc,
         string name,
         MLIR_OpHandle test,
-        MLIR_OpHandle body,
-        MLIR_OpHandle orelse) {
+        MLIR_OpHandle *body,
+        size_t n_body,
+        MLIR_OpHandle *orelse,
+        size_t n_orelse) {
     ASR_DialectField fields[4];
     fields[0].kind = ASR_FIELD_IDENTIFIER_OPT;
     fields[0].name = "name";
@@ -4017,10 +4053,10 @@ static inline MLIR_OpHandle ASR_CreateIfOp(
     fields[1].value.op = test;
     fields[2].kind = ASR_FIELD_STMT_SEQ;
     fields[2].name = "body";
-    fields[2].value.op = body;
+    fields[2].value.op = (MLIR_OpHandle)(uintptr_t)body;
     fields[3].kind = ASR_FIELD_STMT_SEQ;
     fields[3].name = "orelse";
-    fields[3].value.op = orelse;
+    fields[3].value.op = (MLIR_OpHandle)(uintptr_t)orelse;
     return ASR_DialectCreateOp(ctx, ASR_DIALECT_OP_STMT_IF, loc, fields, 4);
 }
 
@@ -4050,11 +4086,12 @@ static inline MLIR_OpHandle ASR_CreateIfArithmeticOp(
 static inline MLIR_OpHandle ASR_CreateImplicitDeallocateOp(
         MLIR_Context *ctx,
         MLIR_LocationHandle loc,
-        MLIR_OpHandle vars) {
+        MLIR_OpHandle *vars,
+        size_t n_vars) {
     ASR_DialectField fields[1];
     fields[0].kind = ASR_FIELD_EXPR_SEQ;
     fields[0].name = "vars";
-    fields[0].value.op = vars;
+    fields[0].value.op = (MLIR_OpHandle)(uintptr_t)vars;
     return ASR_DialectCreateOp(ctx, ASR_DIALECT_OP_STMT_IMPLICITDEALLOCATE, loc, fields, 1);
 }
 
@@ -4062,7 +4099,8 @@ static inline MLIR_OpHandle ASR_CreateIntrinsicImpureSubroutineOp(
         MLIR_Context *ctx,
         MLIR_LocationHandle loc,
         int64_t sub_intrinsic_id,
-        MLIR_OpHandle args,
+        MLIR_OpHandle *args,
+        size_t n_args,
         int64_t overload_id) {
     ASR_DialectField fields[3];
     fields[0].kind = ASR_FIELD_I64;
@@ -4070,7 +4108,7 @@ static inline MLIR_OpHandle ASR_CreateIntrinsicImpureSubroutineOp(
     fields[0].value.i64 = sub_intrinsic_id;
     fields[1].kind = ASR_FIELD_EXPR_SEQ;
     fields[1].name = "args";
-    fields[1].value.op = args;
+    fields[1].value.op = (MLIR_OpHandle)(uintptr_t)args;
     fields[2].kind = ASR_FIELD_I64;
     fields[2].name = "overload_id";
     fields[2].value.i64 = overload_id;
@@ -4140,11 +4178,12 @@ static inline MLIR_OpHandle ASR_CreateListRemoveOp(
 static inline MLIR_OpHandle ASR_CreateNullifyOp(
         MLIR_Context *ctx,
         MLIR_LocationHandle loc,
-        MLIR_OpHandle vars) {
+        MLIR_OpHandle *vars,
+        size_t n_vars) {
     ASR_DialectField fields[1];
     fields[0].kind = ASR_FIELD_EXPR_SEQ;
     fields[0].name = "vars";
-    fields[0].value.op = vars;
+    fields[0].value.op = (MLIR_OpHandle)(uintptr_t)vars;
     return ASR_DialectCreateOp(ctx, ASR_DIALECT_OP_STMT_NULLIFY, loc, fields, 1);
 }
 
@@ -4154,7 +4193,8 @@ static inline MLIR_OpHandle ASR_CreateOMPRegionOp(
         int64_t region,
         MLIR_OpHandle *clauses,
         size_t n_clauses,
-        MLIR_OpHandle body) {
+        MLIR_OpHandle *body,
+        size_t n_body) {
     ASR_DialectField fields[3];
     fields[0].kind = ASR_FIELD_I64;
     fields[0].name = "region";
@@ -4164,7 +4204,7 @@ static inline MLIR_OpHandle ASR_CreateOMPRegionOp(
     fields[1].value.op = (MLIR_OpHandle)(uintptr_t)clauses;
     fields[2].kind = ASR_FIELD_STMT_SEQ;
     fields[2].name = "body";
-    fields[2].value.op = body;
+    fields[2].value.op = (MLIR_OpHandle)(uintptr_t)body;
     return ASR_DialectCreateOp(ctx, ASR_DIALECT_OP_STMT_OMPREGION, loc, fields, 3);
 }
 
@@ -4205,7 +4245,8 @@ static inline MLIR_OpHandle ASR_CreateSelectOp(
         MLIR_OpHandle test,
         MLIR_OpHandle *body,
         size_t n_body,
-        MLIR_OpHandle default_,
+        MLIR_OpHandle *default_,
+        size_t n_default_,
         bool enable_fall_through) {
     ASR_DialectField fields[5];
     fields[0].kind = ASR_FIELD_IDENTIFIER_OPT;
@@ -4219,7 +4260,7 @@ static inline MLIR_OpHandle ASR_CreateSelectOp(
     fields[2].value.op = (MLIR_OpHandle)(uintptr_t)body;
     fields[3].kind = ASR_FIELD_STMT_SEQ;
     fields[3].name = "default";
-    fields[3].value.op = default_;
+    fields[3].value.op = (MLIR_OpHandle)(uintptr_t)default_;
     fields[4].kind = ASR_FIELD_BOOL;
     fields[4].name = "enable_fall_through";
     fields[4].value.b = enable_fall_through;
@@ -4233,7 +4274,8 @@ static inline MLIR_OpHandle ASR_CreateSelectRankOp(
         MLIR_OpHandle selector,
         MLIR_OpHandle *body,
         size_t n_body,
-        MLIR_OpHandle default_) {
+        MLIR_OpHandle *default_,
+        size_t n_default_) {
     ASR_DialectField fields[4];
     fields[0].kind = ASR_FIELD_IDENTIFIER_OPT;
     fields[0].name = "name";
@@ -4246,7 +4288,7 @@ static inline MLIR_OpHandle ASR_CreateSelectRankOp(
     fields[2].value.op = (MLIR_OpHandle)(uintptr_t)body;
     fields[3].kind = ASR_FIELD_STMT_SEQ;
     fields[3].name = "default";
-    fields[3].value.op = default_;
+    fields[3].value.op = (MLIR_OpHandle)(uintptr_t)default_;
     return ASR_DialectCreateOp(ctx, ASR_DIALECT_OP_STMT_SELECTRANK, loc, fields, 4);
 }
 
@@ -4257,7 +4299,8 @@ static inline MLIR_OpHandle ASR_CreateSelectTypeOp(
         string assoc_name,
         MLIR_OpHandle *body,
         size_t n_body,
-        MLIR_OpHandle default_) {
+        MLIR_OpHandle *default_,
+        size_t n_default_) {
     ASR_DialectField fields[4];
     fields[0].kind = ASR_FIELD_EXPR;
     fields[0].name = "selector";
@@ -4270,7 +4313,7 @@ static inline MLIR_OpHandle ASR_CreateSelectTypeOp(
     fields[2].value.op = (MLIR_OpHandle)(uintptr_t)body;
     fields[3].kind = ASR_FIELD_STMT_SEQ;
     fields[3].name = "default";
-    fields[3].value.op = default_;
+    fields[3].value.op = (MLIR_OpHandle)(uintptr_t)default_;
     return ASR_DialectCreateOp(ctx, ASR_DIALECT_OP_STMT_SELECTTYPE, loc, fields, 4);
 }
 
@@ -4372,18 +4415,20 @@ static inline MLIR_OpHandle ASR_CreateWhereOp(
         MLIR_Context *ctx,
         MLIR_LocationHandle loc,
         MLIR_OpHandle test,
-        MLIR_OpHandle body,
-        MLIR_OpHandle orelse) {
+        MLIR_OpHandle *body,
+        size_t n_body,
+        MLIR_OpHandle *orelse,
+        size_t n_orelse) {
     ASR_DialectField fields[3];
     fields[0].kind = ASR_FIELD_EXPR;
     fields[0].name = "test";
     fields[0].value.op = test;
     fields[1].kind = ASR_FIELD_STMT_SEQ;
     fields[1].name = "body";
-    fields[1].value.op = body;
+    fields[1].value.op = (MLIR_OpHandle)(uintptr_t)body;
     fields[2].kind = ASR_FIELD_STMT_SEQ;
     fields[2].name = "orelse";
-    fields[2].value.op = orelse;
+    fields[2].value.op = (MLIR_OpHandle)(uintptr_t)orelse;
     return ASR_DialectCreateOp(ctx, ASR_DIALECT_OP_STMT_WHERE, loc, fields, 3);
 }
 
@@ -4392,8 +4437,10 @@ static inline MLIR_OpHandle ASR_CreateWhileLoopOp(
         MLIR_LocationHandle loc,
         string name,
         MLIR_OpHandle test,
-        MLIR_OpHandle body,
-        MLIR_OpHandle orelse) {
+        MLIR_OpHandle *body,
+        size_t n_body,
+        MLIR_OpHandle *orelse,
+        size_t n_orelse) {
     ASR_DialectField fields[4];
     fields[0].kind = ASR_FIELD_IDENTIFIER_OPT;
     fields[0].name = "name";
@@ -4403,10 +4450,10 @@ static inline MLIR_OpHandle ASR_CreateWhileLoopOp(
     fields[1].value.op = test;
     fields[2].kind = ASR_FIELD_STMT_SEQ;
     fields[2].name = "body";
-    fields[2].value.op = body;
+    fields[2].value.op = (MLIR_OpHandle)(uintptr_t)body;
     fields[3].kind = ASR_FIELD_STMT_SEQ;
     fields[3].name = "orelse";
-    fields[3].value.op = orelse;
+    fields[3].value.op = (MLIR_OpHandle)(uintptr_t)orelse;
     return ASR_DialectCreateOp(ctx, ASR_DIALECT_OP_STMT_WHILELOOP, loc, fields, 4);
 }
 
@@ -4415,7 +4462,8 @@ static inline MLIR_OpHandle ASR_CreateAssociateBlockOp(
         MLIR_LocationHandle loc,
         MLIR_OpHandle symtab,
         string name,
-        MLIR_OpHandle body) {
+        MLIR_OpHandle *body,
+        size_t n_body) {
     ASR_DialectField fields[3];
     fields[0].kind = ASR_FIELD_OP;
     fields[0].name = "symtab";
@@ -4425,7 +4473,7 @@ static inline MLIR_OpHandle ASR_CreateAssociateBlockOp(
     fields[1].value.str = name;
     fields[2].kind = ASR_FIELD_STMT_SEQ;
     fields[2].name = "body";
-    fields[2].value.op = body;
+    fields[2].value.op = (MLIR_OpHandle)(uintptr_t)body;
     return ASR_DialectCreateOp(ctx, ASR_DIALECT_OP_SYMBOL_ASSOCIATEBLOCK, loc, fields, 3);
 }
 
@@ -4434,7 +4482,8 @@ static inline MLIR_OpHandle ASR_CreateBlockOp(
         MLIR_LocationHandle loc,
         MLIR_OpHandle symtab,
         string name,
-        MLIR_OpHandle body) {
+        MLIR_OpHandle *body,
+        size_t n_body) {
     ASR_DialectField fields[3];
     fields[0].kind = ASR_FIELD_OP;
     fields[0].name = "symtab";
@@ -4444,7 +4493,7 @@ static inline MLIR_OpHandle ASR_CreateBlockOp(
     fields[1].value.str = name;
     fields[2].kind = ASR_FIELD_STMT_SEQ;
     fields[2].name = "body";
-    fields[2].value.op = body;
+    fields[2].value.op = (MLIR_OpHandle)(uintptr_t)body;
     return ASR_DialectCreateOp(ctx, ASR_DIALECT_OP_SYMBOL_BLOCK, loc, fields, 3);
 }
 
@@ -4556,8 +4605,10 @@ static inline MLIR_OpHandle ASR_CreateFunctionOp(
         string name,
         MLIR_TypeHandle function_signature,
         string dependencies,
-        MLIR_OpHandle args,
-        MLIR_OpHandle body,
+        MLIR_OpHandle *args,
+        size_t n_args,
+        MLIR_OpHandle *body,
+        size_t n_body,
         MLIR_OpHandle return_var,
         int64_t access,
         bool deterministic,
@@ -4580,10 +4631,10 @@ static inline MLIR_OpHandle ASR_CreateFunctionOp(
     fields[3].value.str = dependencies;
     fields[4].kind = ASR_FIELD_EXPR_SEQ;
     fields[4].name = "args";
-    fields[4].value.op = args;
+    fields[4].value.op = (MLIR_OpHandle)(uintptr_t)args;
     fields[5].kind = ASR_FIELD_STMT_SEQ;
     fields[5].name = "body";
-    fields[5].value.op = body;
+    fields[5].value.op = (MLIR_OpHandle)(uintptr_t)body;
     fields[6].kind = ASR_FIELD_EXPR_OPT;
     fields[6].name = "return_var";
     fields[6].value.op = return_var;
@@ -4638,8 +4689,10 @@ static inline MLIR_OpHandle ASR_CreateGpuKernelFunctionOp(
         string name,
         MLIR_TypeHandle function_signature,
         string dependencies,
-        MLIR_OpHandle args,
-        MLIR_OpHandle body,
+        MLIR_OpHandle *args,
+        size_t n_args,
+        MLIR_OpHandle *body,
+        size_t n_body,
         int64_t access,
         MLIR_OpHandle start_name,
         MLIR_OpHandle end_name) {
@@ -4658,10 +4711,10 @@ static inline MLIR_OpHandle ASR_CreateGpuKernelFunctionOp(
     fields[3].value.str = dependencies;
     fields[4].kind = ASR_FIELD_EXPR_SEQ;
     fields[4].name = "args";
-    fields[4].value.op = args;
+    fields[4].value.op = (MLIR_OpHandle)(uintptr_t)args;
     fields[5].kind = ASR_FIELD_STMT_SEQ;
     fields[5].name = "body";
-    fields[5].value.op = body;
+    fields[5].value.op = (MLIR_OpHandle)(uintptr_t)body;
     fields[6].kind = ASR_FIELD_I64;
     fields[6].name = "access";
     fields[6].value.i64 = access;
@@ -4742,7 +4795,8 @@ static inline MLIR_OpHandle ASR_CreateProgramOp(
         MLIR_OpHandle symtab,
         string name,
         string dependencies,
-        MLIR_OpHandle body,
+        MLIR_OpHandle *body,
+        size_t n_body,
         MLIR_OpHandle start_name,
         MLIR_OpHandle end_name) {
     ASR_DialectField fields[6];
@@ -4757,7 +4811,7 @@ static inline MLIR_OpHandle ASR_CreateProgramOp(
     fields[2].value.str = dependencies;
     fields[3].kind = ASR_FIELD_STMT_SEQ;
     fields[3].name = "body";
-    fields[3].value.op = body;
+    fields[3].value.op = (MLIR_OpHandle)(uintptr_t)body;
     fields[4].kind = ASR_FIELD_OP;
     fields[4].name = "start_name";
     fields[4].value.op = start_name;
@@ -5362,14 +5416,15 @@ static inline MLIR_OpHandle ASR_CreateClassStmtOp(
         MLIR_Context *ctx,
         MLIR_LocationHandle loc,
         string sym,
-        MLIR_OpHandle body) {
+        MLIR_OpHandle *body,
+        size_t n_body) {
     ASR_DialectField fields[2];
     fields[0].kind = ASR_FIELD_IDENTIFIER;
     fields[0].name = "sym";
     fields[0].value.str = sym;
     fields[1].kind = ASR_FIELD_STMT_SEQ;
     fields[1].name = "body";
-    fields[1].value.op = body;
+    fields[1].value.op = (MLIR_OpHandle)(uintptr_t)body;
     return ASR_DialectCreateOp(ctx, ASR_DIALECT_OP_TYPE_STMT_CLASSSTMT, loc, fields, 2);
 }
 
@@ -5377,14 +5432,15 @@ static inline MLIR_OpHandle ASR_CreateTypeStmtNameOp(
         MLIR_Context *ctx,
         MLIR_LocationHandle loc,
         string sym,
-        MLIR_OpHandle body) {
+        MLIR_OpHandle *body,
+        size_t n_body) {
     ASR_DialectField fields[2];
     fields[0].kind = ASR_FIELD_IDENTIFIER;
     fields[0].name = "sym";
     fields[0].value.str = sym;
     fields[1].kind = ASR_FIELD_STMT_SEQ;
     fields[1].name = "body";
-    fields[1].value.op = body;
+    fields[1].value.op = (MLIR_OpHandle)(uintptr_t)body;
     return ASR_DialectCreateOp(ctx, ASR_DIALECT_OP_TYPE_STMT_TYPESTMTNAME, loc, fields, 2);
 }
 
@@ -5392,14 +5448,15 @@ static inline MLIR_OpHandle ASR_CreateTypeStmtTypeOp(
         MLIR_Context *ctx,
         MLIR_LocationHandle loc,
         MLIR_TypeHandle type,
-        MLIR_OpHandle body) {
+        MLIR_OpHandle *body,
+        size_t n_body) {
     ASR_DialectField fields[2];
     fields[0].kind = ASR_FIELD_TTYPE;
     fields[0].name = "type";
     fields[0].value.type = type;
     fields[1].kind = ASR_FIELD_STMT_SEQ;
     fields[1].name = "body";
-    fields[1].value.op = body;
+    fields[1].value.op = (MLIR_OpHandle)(uintptr_t)body;
     return ASR_DialectCreateOp(ctx, ASR_DIALECT_OP_TYPE_STMT_TYPESTMTTYPE, loc, fields, 2);
 }
 
@@ -5407,7 +5464,8 @@ static inline MLIR_OpHandle ASR_CreateTranslationUnitOp(
         MLIR_Context *ctx,
         MLIR_LocationHandle loc,
         MLIR_OpHandle symtab,
-        MLIR_OpHandle items) {
+        MLIR_OpHandle *items,
+        size_t n_items) {
     ASR_DialectField fields[2];
     fields[0].kind = ASR_FIELD_OP;
     fields[0].name = "symtab";
