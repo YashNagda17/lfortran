@@ -2,8 +2,8 @@
 #include "asr_dialect_api.h"
 
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
+#include <base/string.h>
 
 struct ASR_LoweringContext {
     MLIR_Context *ctx;
@@ -37,7 +37,7 @@ static size_t n_sym_slots = 0;
 static string arena_ssa(ASR_LoweringContext *lc) {
     char *buf = (char *)arena_alloc(lc->ctx->arena, 32);
     snprintf(buf, 32, "v%d", lc->ssa_counter++);
-    return str_from_cstr(buf);
+    return str_from_cstr_view(buf);
 }
 
 static MLIR_AttributeHandle get_attr(MLIR_OpHandle op, const char *field) {
@@ -205,7 +205,7 @@ bool ASR_LowerVariable(ASR_LoweringContext *lc, MLIR_OpHandle op) {
 bool ASR_LowerAssignment(ASR_LoweringContext *lc, MLIR_OpHandle op) {
     MLIR_ValueHandle val = lower_expr_value(lc, get_op_ref(op, "value"));
     MLIR_OpHandle target = get_op_ref(op, "target");
-    ASR_DialectOpKind tk = ASR_DialectGetOpKindNative(target);
+    ASR_DialectOpKind tk = ASR_DialectGetOpKind(target);
     if (tk == ASR_DIALECT_OP_EXPR_VAR) {
         string sym = get_str(target, "v");
         ASR_SymSlot *slot = lookup_sym(sym);
@@ -255,9 +255,9 @@ static MLIR_ValueHandle lower_expr_value(ASR_LoweringContext *lc, MLIR_OpHandle 
     if (op == MLIR_INVALID_HANDLE) {
         return MLIR_INVALID_HANDLE;
     }
-    ASR_DialectOpKind kind = ASR_DialectGetOpKindNative(op);
+    ASR_DialectOpKind kind = ASR_DialectGetOpKind(op);
     switch (kind) {
-        case ASR_DIALECT_OP_EXPR_INTEGER_CONSTANT: {
+        case ASR_DIALECT_OP_EXPR_INTEGERCONSTANT: {
             int64_t n = get_i64(op, "n", 0);
             return emit_const_i32(lc, n);
         }
@@ -275,7 +275,7 @@ static MLIR_ValueHandle lower_expr_value(ASR_LoweringContext *lc, MLIR_OpHandle 
                 NULL, 0, rts, 1, rs, 1, ops, 2));
             return res;
         }
-        case ASR_DIALECT_OP_EXPR_INTEGER_BIN_OP: {
+        case ASR_DIALECT_OP_EXPR_INTEGERBINOP: {
             MLIR_ValueHandle lhs = lower_expr_value(lc, get_op_ref(op, "left"));
             MLIR_ValueHandle rhs = lower_expr_value(lc, get_op_ref(op, "right"));
             int64_t bop = get_i64(op, "op", 0);
@@ -308,67 +308,6 @@ static void init_types(ASR_LoweringContext *lc) {
     lc->index_ty = MLIR_CreateTypeIndex(lc->ctx);
     int64_t shape[1] = {1};
     lc->memref_i32_1_ty = MLIR_CreateTypeMemref(lc->ctx, shape, 1, lc->i32_ty);
-}
-
-bool ASR_DialectLowerModuleNative(
-    MLIR_Context *ctx, MLIR_OpHandle module, const ASR_DialectOptions *options) {
-    if (MLIR_GetOpType(module) != OP_TYPE_MODULE) {
-        return false;
-    }
-    n_sym_slots = 0;
-
-    ASR_LoweringContext lc = {};
-    lc.ctx = ctx;
-    lc.module = module;
-    lc.options = options;
-    lc.loc = MLIR_CreateLocationUnknown(ctx, str_lit("lfortran"));
-    init_types(&lc);
-
-    MLIR_RegionHandle mod_region = MLIR_GetOpRegion(module, 0);
-    MLIR_BlockHandle asr_block = MLIR_GetRegionBlock(mod_region, 0);
-    size_t n_asr_ops = MLIR_GetBlockNumOps(asr_block);
-
-    // Collect ASR dialect ops, then rebuild module with high-level MLIR.
-    MLIR_RegionHandle new_mod_region = MLIR_CreateRegion(ctx);
-    lc.module_block = MLIR_CreateBlock(ctx);
-    MLIR_AppendRegionBlock(ctx, new_mod_region, lc.module_block);
-
-    lc.fn_region = MLIR_CreateRegion(ctx);
-    lc.cur_block = MLIR_CreateBlock(ctx);
-    MLIR_AppendRegionBlock(ctx, lc.fn_region, lc.cur_block);
-    lc.block_terminated = false;
-
-    for (size_t i = 0; i < n_asr_ops; ++i) {
-        MLIR_OpHandle op = MLIR_GetBlockOp(asr_block, i);
-        if (!ASR_DialectLowerOneOp(&lc, op)) {
-            if (!options || !options->allow_unimplemented_nodes) {
-                return false;
-            }
-        }
-    }
-
-    if (!lc.block_terminated) {
-        ASR_LowerReturn(&lc, MLIR_INVALID_HANDLE);
-    }
-
-    MLIR_TypeHandle res_tys[1] = {lc.i32_ty};
-    MLIR_TypeHandle fn_ty = MLIR_CreateTypeFunction(ctx, NULL, 0, res_tys, 1);
-    MLIR_AttributeHandle sym_name = MLIR_CreateAttributeString(ctx,
-        str_lit("sym_name"), str_lit("main"));
-    MLIR_AttributeHandle fn_ty_attr = MLIR_CreateAttributeType(ctx,
-        str_lit("function_type"), fn_ty);
-    MLIR_AttributeHandle attrs[2] = {sym_name, fn_ty_attr};
-    MLIR_RegionHandle regs[1] = {lc.fn_region};
-    MLIR_OpHandle fn = MLIR_CreateOp(ctx, OP_TYPE_FUNC_FUNC, str_lit("func.func"),
-        attrs, 2, NULL, 0, NULL, 0, NULL, 0, regs, 1,
-        lc.loc, MLIR_INVALID_HANDLE, str_lit(""), -1);
-    MLIR_AppendBlockOp(ctx, lc.module_block, fn);
-
-    // Replace module body: clear old block ops and append new func.
-    // Native API lacks block clear; append to existing module block for now.
-    MLIR_AppendBlockOp(ctx, asr_block, fn);
-    (void)new_mod_region;
-    return true;
 }
 
 // Stub handlers for remaining focused ops (expand incrementally).
@@ -470,4 +409,63 @@ bool ASR_LowerComplex(ASR_LoweringContext *lc, MLIR_OpHandle op) {
 }
 bool ASR_LowerArray(ASR_LoweringContext *lc, MLIR_OpHandle op) {
     (void)lc; (void)op; return true;
+}
+
+#include "generated/asr_dialect_lowering_dispatch.inc"
+
+bool ASR_DialectLowerModuleNative(
+    MLIR_Context *ctx, MLIR_OpHandle module, const ASR_DialectOptions *options) {
+    if (MLIR_GetOpType(module) != OP_TYPE_MODULE) {
+        return false;
+    }
+    n_sym_slots = 0;
+
+    ASR_LoweringContext lc = {};
+    lc.ctx = ctx;
+    lc.module = module;
+    lc.options = options;
+    lc.loc = MLIR_CreateLocationUnknown(ctx, str_lit("lfortran"));
+    init_types(&lc);
+
+    MLIR_RegionHandle mod_region = MLIR_GetOpRegion(module, 0);
+    MLIR_BlockHandle asr_block = MLIR_GetRegionBlock(mod_region, 0);
+    size_t n_asr_ops = MLIR_GetBlockNumOps(asr_block);
+
+    MLIR_RegionHandle new_mod_region = MLIR_CreateRegion(ctx);
+    lc.module_block = MLIR_CreateBlock(ctx);
+    MLIR_AppendRegionBlock(ctx, new_mod_region, lc.module_block);
+
+    lc.fn_region = MLIR_CreateRegion(ctx);
+    lc.cur_block = MLIR_CreateBlock(ctx);
+    MLIR_AppendRegionBlock(ctx, lc.fn_region, lc.cur_block);
+    lc.block_terminated = false;
+
+    for (size_t i = 0; i < n_asr_ops; ++i) {
+        MLIR_OpHandle op = MLIR_GetBlockOp(asr_block, i);
+        if (!ASR_DialectLowerOneOp(&lc, op)) {
+            if (!options || !options->allow_unimplemented_nodes) {
+                return false;
+            }
+        }
+    }
+
+    if (!lc.block_terminated) {
+        ASR_LowerReturn(&lc, MLIR_INVALID_HANDLE);
+    }
+
+    MLIR_TypeHandle res_tys[1] = {lc.i32_ty};
+    MLIR_TypeHandle fn_ty = MLIR_CreateTypeFunction(ctx, NULL, 0, res_tys, 1);
+    MLIR_AttributeHandle sym_name = MLIR_CreateAttributeString(ctx,
+        str_lit("sym_name"), str_lit("main"));
+    MLIR_AttributeHandle fn_ty_attr = MLIR_CreateAttributeType(ctx,
+        str_lit("function_type"), fn_ty);
+    MLIR_AttributeHandle attrs[2] = {sym_name, fn_ty_attr};
+    MLIR_RegionHandle regs[1] = {lc.fn_region};
+    MLIR_OpHandle fn = MLIR_CreateOp(ctx, OP_TYPE_FUNC_FUNC, str_lit("func.func"),
+        attrs, 2, NULL, 0, NULL, 0, NULL, 0, regs, 1,
+        lc.loc, MLIR_INVALID_HANDLE, str_lit(""), -1);
+    MLIR_AppendBlockOp(ctx, lc.module_block, fn);
+    MLIR_AppendBlockOp(ctx, asr_block, fn);
+    (void)new_mod_region;
+    return true;
 }

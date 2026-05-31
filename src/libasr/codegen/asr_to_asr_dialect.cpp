@@ -21,6 +21,13 @@ namespace LCompilers {
 
 extern void ensure_mlir_corec_platform_initialized();
 
+static string asr_cstr(const char *s) {
+    if (!s) {
+        return str_lit("");
+    }
+    return str_from_cstr_len_view_const(s, (uint64_t)std::strlen(s));
+}
+
 class AsrDialectError {
 public:
     diag::Diagnostic d;
@@ -90,19 +97,14 @@ class ASRToAsrDialectVisitor {
 public:
     Arena *arena = nullptr;
     MLIR_Context ctx{};
-    MLIR_LocationHandle loc = MLIR_INVALID_HANDLE;
+    MLIR_LocationHandle mlir_loc = MLIR_INVALID_HANDLE;
     MLIR_BlockHandle module_block = MLIR_INVALID_HANDLE;
     MLIR_OpHandle module_op = MLIR_INVALID_HANDLE;
     MLIR_OpHandle last_expr_op = MLIR_INVALID_HANDLE;
     MLIR_ValueHandle last_value = MLIR_INVALID_HANDLE;
     bool block_terminated = false;
 
-    MLIR_LocationHandle default_loc() { return loc; }
-
-    MLIR_LocationHandle loc(const Location &l) {
-        (void)l;
-        return loc;
-    }
+    MLIR_LocationHandle default_loc() { return mlir_loc; }
 
     MLIR_TypeHandle convert_type(const ASR::ttype_t &t) {
         if (ASR::is_a<ASR::Integer_t>(t)) {
@@ -121,7 +123,7 @@ public:
 
     string emit_symbol_ref(const ASR::symbol_t &s) {
         if (ASR::is_a<ASR::Variable_t>(s)) {
-            return str_from_cstr(ASR::down_cast<ASR::Variable_t>(&s)->m_name);
+            return asr_cstr(ASR::down_cast<ASR::Variable_t>(&s)->m_name);
         }
         return str_lit("unknown");
     }
@@ -133,14 +135,14 @@ public:
         }
         MLIR_SetArenaAllocator(&ctx, arena);
         ctx.no_def_use_tracking = true;
-        loc = MLIR_CreateLocationUnknown(&ctx, str_lit("lfortran"));
+        mlir_loc = MLIR_CreateLocationUnknown(&ctx, str_lit("lfortran"));
         MLIR_RegionHandle mr = MLIR_CreateRegion(&ctx);
         module_block = MLIR_CreateBlock(&ctx);
         MLIR_AppendRegionBlock(&ctx, mr, module_block);
         MLIR_RegionHandle mregs[1] = {mr};
         module_op = MLIR_CreateOp(&ctx, OP_TYPE_MODULE, str_lit("module"),
             nullptr, 0, nullptr, 0, nullptr, 0, nullptr, 0, mregs, 1,
-            loc, MLIR_INVALID_HANDLE, str_lit(""), -1);
+            mlir_loc, MLIR_INVALID_HANDLE, str_lit(""), -1);
     }
 
     void append_module(MLIR_OpHandle op) {
@@ -161,15 +163,15 @@ public:
                 type_field("type", convert_type(*x.m_type)),
                 i64_field("intboz_type", (int64_t)x.m_intboz_type),
             };
-            return create_op(ASR_DIALECT_OP_EXPR_INTEGER_CONSTANT,
-                loc(e.base.loc), fields, 3);
+            return create_op(ASR_DIALECT_OP_EXPR_INTEGERCONSTANT,
+                default_loc(), fields, 3);
         }
         if (ASR::is_a<ASR::Var_t>(e)) {
             const ASR::Var_t &x = *ASR::down_cast<ASR::Var_t>(&e);
             ASR_DialectField fields[1] = {
                 str_field("v", emit_symbol_ref(*x.m_v)),
             };
-            return create_op(ASR_DIALECT_OP_EXPR_VAR, loc(e.base.loc), fields, 1);
+            return create_op(ASR_DIALECT_OP_EXPR_VAR, default_loc(), fields, 1);
         }
         if (ASR::is_a<ASR::IntegerBinOp_t>(e)) {
             const ASR::IntegerBinOp_t &x =
@@ -182,8 +184,8 @@ public:
                 op_field("right", right),
                 type_field("type", convert_type(*x.m_type)),
             };
-            return create_op(ASR_DIALECT_OP_EXPR_INTEGER_BIN_OP,
-                loc(e.base.loc), fields, 4);
+            return create_op(ASR_DIALECT_OP_EXPR_INTEGERBINOP,
+                default_loc(), fields, 4);
         }
         throw AsrDialectError(
             "asr dialect: expression kind not supported yet", e.base.loc);
@@ -202,7 +204,7 @@ public:
                 bool_field("move_allocation", x.m_move_allocation),
             };
             MLIR_OpHandle op = create_op(ASR_DIALECT_OP_STMT_ASSIGNMENT,
-                loc(s.base.loc), fields, 4);
+                default_loc(), fields, 4);
             append_module(op);
             return;
         }
@@ -211,12 +213,12 @@ public:
             MLIR_OpHandle text = emit_expr_op(*x.m_text);
             ASR_DialectField fields[1] = {op_field("text", text)};
             append_module(create_op(ASR_DIALECT_OP_STMT_PRINT,
-                loc(s.base.loc), fields, 1));
+                default_loc(), fields, 1));
             return;
         }
         if (ASR::is_a<ASR::Return_t>(s)) {
             append_module(create_op(ASR_DIALECT_OP_STMT_RETURN,
-                loc(s.base.loc), nullptr, 0));
+                default_loc(), nullptr, 0));
             block_terminated = true;
             return;
         }
@@ -226,21 +228,21 @@ public:
 
     void visit_Program(const ASR::Program_t &x) {
         ASR_DialectField prog_fields[1] = {
-            str_field("name", str_from_cstr(x.m_name)),
+            str_field("name", asr_cstr(x.m_name)),
         };
         append_module(create_op(ASR_DIALECT_OP_SYMBOL_PROGRAM,
-            loc(x.base.base.loc), prog_fields, 1));
+            default_loc(), prog_fields, 1));
 
         for (auto &item : x.m_symtab->get_scope()) {
             if (ASR::is_a<ASR::Variable_t>(*item.second)) {
                 const ASR::Variable_t &v =
                     *ASR::down_cast<ASR::Variable_t>(item.second);
                 ASR_DialectField fields[2] = {
-                    str_field("name", str_from_cstr(v.m_name)),
+                    str_field("name", asr_cstr(v.m_name)),
                     type_field("type", convert_type(*v.m_type)),
                 };
                 append_module(create_op(ASR_DIALECT_OP_SYMBOL_VARIABLE,
-                    loc(v.base.base.loc), fields, 2));
+                    default_loc(), fields, 2));
             }
         }
         for (size_t i = 0; i < x.n_body; i++) {
@@ -251,13 +253,13 @@ public:
         }
         if (!block_terminated) {
             append_module(create_op(ASR_DIALECT_OP_STMT_RETURN,
-                loc(x.base.base.loc), nullptr, 0));
+                default_loc(), nullptr, 0));
         }
     }
 
     void visit_TranslationUnit(const ASR::TranslationUnit_t &x) {
         emit_module_skeleton();
-        append_module(create_op(ASR_DIALECT_OP_UNIT_TRANSLATION_UNIT,
+        append_module(create_op(ASR_DIALECT_OP_UNIT_TRANSLATIONUNIT,
             default_loc(), nullptr, 0));
         for (auto &item : x.m_symtab->get_scope()) {
             if (ASR::is_a<ASR::Program_t>(*item.second)) {

@@ -1,6 +1,7 @@
 // Upstream ASR dialect API stub — delegates to native until ODS registration lands.
 #include "asr_dialect_api.h"
 
+extern "C" {
 extern MLIR_OpHandle ASR_DialectCreateOpNative(
     MLIR_Context *ctx, ASR_DialectOpKind kind, MLIR_LocationHandle loc,
     const ASR_DialectField *fields, size_t n_fields);
@@ -31,4 +32,5 @@ bool ASR_DialectLowerToHighMLIRUpstream(
 
 string ASR_DialectPrintUpstream(MLIR_Context *ctx, MLIR_OpHandle module) {
     return ASR_DialectPrintNative(ctx, module);
+}
 }

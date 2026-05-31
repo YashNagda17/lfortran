@@ -2,8 +2,8 @@
 #include "asr_dialect_api.h"
 
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
+#include <base/string.h>
 
 #define ASR_KIND_ATTR str_lit("asr.op_kind")
 #define ASR_FIELD_PREFIX "asr.f."
@@ -14,7 +14,7 @@ static string asr_field_attr_name(Arena *arena, const char *field_name) {
     memcpy(buf, ASR_FIELD_PREFIX, strlen(ASR_FIELD_PREFIX));
     memcpy(buf + strlen(ASR_FIELD_PREFIX), field_name, strlen(field_name));
     buf[n] = '\0';
-    return str_from_cstr(buf);
+    return str_from_cstr_view(buf);
 }
 
 static MLIR_AttributeHandle field_to_attr(
@@ -89,11 +89,12 @@ MLIR_OpHandle ASR_DialectCreateOpNative(
         char name_buf[32];
         snprintf(name_buf, sizeof(name_buf), "asr_v%zu", (size_t)kind);
         result = MLIR_CreateValueOpResult(ctx, MLIR_INVALID_HANDLE, 0, result_ty,
-            str_from_cstr(name_buf), loc);
+            str_from_cstr_view(name_buf), loc);
         rs[0] = result;
     }
 
-    string opname = str_from_cstr(schema->mlir_name);
+    string opname = str_from_cstr_len_view_const(
+        schema->mlir_name, (uint64_t)strlen(schema->mlir_name));
     return MLIR_CreateOp(ctx, OP_TYPE_UNREGISTERED, opname, attrs, n_attrs,
         result_ty != MLIR_INVALID_HANDLE ? rts : NULL,
         result_ty != MLIR_INVALID_HANDLE ? 1 : 0,
