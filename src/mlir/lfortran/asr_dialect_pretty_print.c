@@ -4,6 +4,7 @@
 #include "asr_dialect_fields.h"
 
 #include <stdarg.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -24,6 +25,14 @@ typedef struct {
     bool in_program;
     bool in_translation_unit;
 } ASR_PpCtx;
+
+static void pp_expr(ASR_PpCtx *pp, MLIR_OpHandle op, char *buf, size_t bufsz);
+static void pp_format_index_op(ASR_PpCtx *pp, MLIR_OpHandle idx_op,
+        char *buf, size_t bufsz);
+static void pp_format_array_item(ASR_PpCtx *pp, MLIR_OpHandle op,
+        char *buf, size_t bufsz);
+static void pp_format_print_arg(ASR_PpCtx *pp, MLIR_OpHandle text,
+        char *buf, size_t bufsz);
 
 static void pp_indent(ASR_PpCtx *pp) {
     for (int i = 0; i < pp->indent; ++i) {
@@ -54,8 +63,33 @@ static void pp_format_sym(string name, char *buf, size_t bufsz) {
     snprintf(buf, bufsz, "@%.*s", (int)name.size, name.str);
 }
 
+static int64_t pp_parse_memref_static_len(ASR_PpCtx *pp, MLIR_TypeHandle ty) {
+    if (!MLIR_IsTypeMemref(ty)) {
+        return 0;
+    }
+    string ts = MLIR_GetTypeString(pp->ctx, ty);
+    const char *prefix = "memref<";
+    size_t plen = 7;
+    if (ts.size < plen + 5 || memcmp(ts.str, prefix, plen) != 0) {
+        return 0;
+    }
+    size_t i = plen;
+    int64_t n = 0;
+    while (i < ts.size && ts.str[i] >= '0' && ts.str[i] <= '9') {
+        n = n * 10 + (int64_t)(ts.str[i] - '0');
+        i++;
+    }
+    if (i + 4 >= ts.size || ts.str[i] != 'x') {
+        return 0;
+    }
+    if (memcmp(ts.str + i + 1, "i32", 3) != 0 || ts.str[i + 4] != '>') {
+        return 0;
+    }
+    return n > 0 ? n : 0;
+}
+
 /* Returns true when a type suffix should be printed. Never emits !asr.unknown. */
-static bool pp_type_spelling(MLIR_TypeHandle ty, char *buf, size_t bufsz) {
+static bool pp_type_spelling(ASR_PpCtx *pp, MLIR_TypeHandle ty, char *buf, size_t bufsz) {
     if (ty == MLIR_INVALID_HANDLE) {
         return false;
     }
@@ -67,7 +101,191 @@ static bool pp_type_spelling(MLIR_TypeHandle ty, char *buf, size_t bufsz) {
         snprintf(buf, bufsz, "real(8)");
         return true;
     }
+    if (MLIR_IsTypeMemref(ty)) {
+        MLIR_TypeHandle elem = MLIR_GetTypeShapedElement(ty);
+        char elem_ty[32];
+        int64_t n = pp_parse_memref_static_len(pp, ty);
+        if (n > 0 && pp_type_spelling(pp, elem, elem_ty, sizeof(elem_ty))) {
+            snprintf(buf, bufsz, "%s[%lld]", elem_ty, (long long)n);
+            return true;
+        }
+    }
     return false;
+}
+
+static MLIR_OpHandle pp_peel_cast(MLIR_OpHandle op) {
+    while (op != MLIR_INVALID_HANDLE &&
+            ASR_DialectGetOpKind(op) == ASR_DIALECT_OP_EXPR_CAST) {
+        op = asr_get_field_op(op, "arg");
+    }
+    return op;
+}
+
+/* Index/base formatting without calling pp_expr (avoids mutual recursion). */
+static void pp_format_simple_expr(ASR_PpCtx *pp, MLIR_OpHandle op,
+        char *buf, size_t bufsz) {
+    if (op == MLIR_INVALID_HANDLE) {
+        snprintf(buf, bufsz, "?");
+        return;
+    }
+    op = pp_peel_cast(op);
+    ASR_DialectOpKind kind = ASR_DialectGetOpKind(op);
+    if (kind == ASR_DIALECT_OP_EXPR_INTEGERCONSTANT) {
+        snprintf(buf, bufsz, "%" PRId64, asr_get_field_i64(op, "n", 0));
+        return;
+    }
+    if (kind == ASR_DIALECT_OP_EXPR_VAR) {
+        pp_format_sym(asr_get_field_str(op, "v"), buf, bufsz);
+        return;
+    }
+    pp_expr(pp, op, buf, bufsz);
+}
+
+static void pp_format_index_op(ASR_PpCtx *pp, MLIR_OpHandle idx_op,
+        char *buf, size_t bufsz) {
+    if (idx_op == MLIR_INVALID_HANDLE) {
+        snprintf(buf, bufsz, "?");
+        return;
+    }
+    if (ASR_DialectGetOpKind(idx_op) == ASR_DIALECT_OP_ARRAY_INDEX_ARRAY_INDEX) {
+        MLIR_OpHandle right = asr_get_field_op(idx_op, "right");
+        MLIR_OpHandle left = asr_get_field_op(idx_op, "left");
+        if (right != MLIR_INVALID_HANDLE) {
+            pp_format_simple_expr(pp, right, buf, bufsz);
+            return;
+        }
+        if (left != MLIR_INVALID_HANDLE) {
+            pp_format_simple_expr(pp, left, buf, bufsz);
+            return;
+        }
+    }
+    pp_format_simple_expr(pp, idx_op, buf, bufsz);
+}
+
+static bool pp_format_array_literal(ASR_PpCtx *pp, const int32_t *data,
+        int64_t n_data, char *buf, size_t bufsz) {
+    (void)pp;
+    if (!data || n_data <= 0) {
+        return false;
+    }
+    size_t pos = 0;
+    pos += (size_t)snprintf(buf + pos, bufsz - pos, "[");
+    int64_t limit = n_data > 64 ? 64 : n_data;
+    for (int64_t i = 0; i < limit; ++i) {
+        if (i > 0) {
+            pos += (size_t)snprintf(buf + pos, bufsz - pos, ", ");
+        }
+        pos += (size_t)snprintf(buf + pos, bufsz - pos, "%" PRId32, data[i]);
+        if (pos >= bufsz - 8) {
+            break;
+        }
+    }
+    if (n_data > limit) {
+        pos += (size_t)snprintf(buf + pos, bufsz - pos, ", ...");
+    }
+    snprintf(buf + pos, bufsz - pos, "]");
+    return true;
+}
+
+static bool pp_format_array_constant(ASR_PpCtx *pp, MLIR_OpHandle op,
+        char *buf, size_t bufsz) {
+    int64_t n_data = asr_get_field_i64(op, "n_data", 0);
+    intptr_t data_ptr = (intptr_t)asr_get_field_i64(op, "data", 0);
+    if (data_ptr == 0 || n_data <= 0) {
+        return false;
+    }
+    return pp_format_array_literal(pp, (const int32_t *)(void *)data_ptr,
+        n_data, buf, bufsz);
+}
+
+static bool pp_format_array_constructor(ASR_PpCtx *pp, MLIR_OpHandle op,
+        char *buf, size_t bufsz) {
+    MLIR_OpHandle *args = asr_get_field_op_seq(op, "args");
+    size_t n = asr_get_seq_n_args_attr(op);
+    if (!args || n == 0) {
+        return false;
+    }
+    size_t pos = 0;
+    pos += (size_t)snprintf(buf + pos, bufsz - pos, "[");
+    for (size_t i = 0; i < n && pos < bufsz - 16; ++i) {
+        char ebuf[64];
+        if (i > 0) {
+            pos += (size_t)snprintf(buf + pos, bufsz - pos, ", ");
+        }
+        pp_expr(pp, args[i], ebuf, sizeof(ebuf));
+        pos += (size_t)snprintf(buf + pos, bufsz - pos, "%s", ebuf);
+    }
+    snprintf(buf + pos, bufsz - pos, "]");
+    return true;
+}
+
+static bool pp_op_name_is(MLIR_OpHandle op, const char *name) {
+    string nm = MLIR_GetOpName(op);
+    size_t n = 0;
+    while (name[n]) {
+        n++;
+    }
+    return nm.size == n && nm.str && memcmp(nm.str, name, n) == 0;
+}
+
+static bool pp_is_array_item_op(MLIR_OpHandle op) {
+    if (op == MLIR_INVALID_HANDLE) {
+        return false;
+    }
+    if (ASR_DialectGetOpKind(op) == ASR_DIALECT_OP_EXPR_ARRAYITEM) {
+        return true;
+    }
+    return pp_op_name_is(op, "asr.array_item");
+}
+
+static void pp_format_array_item(ASR_PpCtx *pp, MLIR_OpHandle op,
+        char *buf, size_t bufsz) {
+    MLIR_OpHandle base = asr_get_field_op(op, "v");
+    char basebuf[128];
+    char ibuf[64];
+    if (ASR_DialectGetOpKind(base) == ASR_DIALECT_OP_EXPR_VAR) {
+        pp_format_sym(asr_get_field_str(base, "v"), basebuf, sizeof(basebuf));
+    } else {
+        pp_expr(pp, base, basebuf, sizeof(basebuf));
+    }
+    MLIR_OpHandle *indices = asr_get_field_op_seq(op, "args");
+    size_t n_idx = asr_get_seq_n_args_attr(op);
+    if (indices && n_idx > 0) {
+        pp_format_index_op(pp, indices[0], ibuf, sizeof(ibuf));
+        snprintf(buf, bufsz, "%s(%s)", basebuf, ibuf);
+        return;
+    }
+    if (indices && indices[0] != MLIR_INVALID_HANDLE) {
+        pp_format_index_op(pp, indices[0], ibuf, sizeof(ibuf));
+        snprintf(buf, bufsz, "%s(%s)", basebuf, ibuf);
+        return;
+    }
+    snprintf(buf, bufsz, "%s(?)", basebuf);
+}
+
+static void pp_format_print_arg(ASR_PpCtx *pp, MLIR_OpHandle text,
+        char *buf, size_t bufsz) {
+    if (text == MLIR_INVALID_HANDLE) {
+        snprintf(buf, bufsz, "%s", ASR_PP_UNRESOLVED);
+        return;
+    }
+    if (ASR_DialectGetOpKind(text) == ASR_DIALECT_OP_EXPR_VAR) {
+        pp_format_sym(asr_get_field_str(text, "v"), buf, bufsz);
+        return;
+    }
+    if (pp_is_array_item_op(text)) {
+        pp_format_array_item(pp, text, buf, bufsz);
+        return;
+    }
+    if (ASR_DialectGetOpKind(text) == ASR_DIALECT_OP_EXPR_STRINGFORMAT) {
+        MLIR_OpHandle *args = asr_get_field_op_seq(text, "args");
+        size_t n = asr_get_seq_n_args_attr(text);
+        if (args && n > 0) {
+            pp_format_print_arg(pp, args[0], buf, bufsz);
+            return;
+        }
+    }
+    pp_expr(pp, text, buf, bufsz);
 }
 
 static MLIR_TypeHandle pp_expr_result_type(MLIR_OpHandle op) {
@@ -94,6 +312,7 @@ static void pp_expr(ASR_PpCtx *pp, MLIR_OpHandle op, char *buf, size_t bufsz) {
         return;
     }
 
+    op = pp_peel_cast(op);
     ASR_DialectOpKind kind = ASR_DialectGetOpKind(op);
     switch (kind) {
         case ASR_DIALECT_OP_EXPR_INTEGERCONSTANT:
@@ -125,8 +344,28 @@ static void pp_expr(ASR_PpCtx *pp, MLIR_OpHandle op, char *buf, size_t bufsz) {
                 opkw, lbuf, rbuf);
             return;
         }
+        case ASR_DIALECT_OP_EXPR_ARRAYCONSTANT:
+            if (pp_format_array_constant(pp, op, buf, bufsz)) {
+                return;
+            }
+            snprintf(buf, bufsz, "[?]");
+            return;
+        case ASR_DIALECT_OP_EXPR_ARRAYCONSTRUCTOR:
+            if (pp_format_array_constructor(pp, op, buf, bufsz)) {
+                return;
+            }
+            snprintf(buf, bufsz, "[?]");
+            return;
+        case ASR_DIALECT_OP_EXPR_ARRAYITEM:
+            pp_format_array_item(pp, op, buf, bufsz);
+            return;
         default:
             break;
+    }
+
+    if (pp_is_array_item_op(op)) {
+        pp_format_array_item(pp, op, buf, bufsz);
+        return;
     }
 
     const ASR_DialectOpSchema *schema = ASR_DialectLookupSchema(kind);
@@ -296,9 +535,12 @@ static void pp_stmt(ASR_PpCtx *pp, MLIR_OpHandle op) {
 
     if (kind == ASR_DIALECT_OP_SYMBOL_VARIABLE) {
         string name = asr_get_field_str(op, "name");
+        int64_t arr_len = asr_get_array_len_attr(op);
         pp_format_sym(name, buf, sizeof(buf));
-        if (pp_type_spelling(asr_get_field_type(op, "type"), ty, sizeof(ty))) {
+        if (pp_type_spelling(pp, asr_get_field_type(op, "type"), ty, sizeof(ty))) {
             pp_fmt(pp, "asr.variable %s : %s", buf, ty);
+        } else if (arr_len > 0) {
+            pp_fmt(pp, "asr.variable %s : i32[%lld]", buf, (long long)arr_len);
         } else {
             pp_fmt(pp, "asr.variable %s", buf);
         }
@@ -317,7 +559,7 @@ static void pp_stmt(ASR_PpCtx *pp, MLIR_OpHandle op) {
             pp_expr(pp, target, tbuf, sizeof(tbuf));
         }
         pp_expr(pp, value, vbuf, sizeof(vbuf));
-        if (pp_type_spelling(pp_expr_result_type(value), ty, sizeof(ty))) {
+        if (pp_type_spelling(pp, pp_expr_result_type(value), ty, sizeof(ty))) {
             pp_fmt(pp, "asr.assign %s = %s : %s", tbuf, vbuf, ty);
         } else {
             pp_fmt(pp, "asr.assign %s = %s", tbuf, vbuf);
@@ -383,11 +625,7 @@ static void pp_stmt(ASR_PpCtx *pp, MLIR_OpHandle op) {
 
     if (kind == ASR_DIALECT_OP_STMT_PRINT) {
         MLIR_OpHandle text = asr_get_field_op(op, "text");
-        if (ASR_DialectGetOpKind(text) == ASR_DIALECT_OP_EXPR_VAR) {
-            pp_format_sym(asr_get_field_str(text, "v"), buf, sizeof(buf));
-        } else {
-            pp_expr(pp, text, buf, sizeof(buf));
-        }
+        pp_format_print_arg(pp, text, buf, sizeof(buf));
         pp_fmt(pp, "asr.print %s", buf);
         return;
     }
@@ -400,7 +638,10 @@ static void pp_stmt(ASR_PpCtx *pp, MLIR_OpHandle op) {
     /* Expression ops are not printed at module level — only inline in statements. */
     if (kind == ASR_DIALECT_OP_EXPR_INTEGERCONSTANT ||
             kind == ASR_DIALECT_OP_EXPR_INTEGERBINOP ||
-            kind == ASR_DIALECT_OP_EXPR_VAR) {
+            kind == ASR_DIALECT_OP_EXPR_VAR ||
+            kind == ASR_DIALECT_OP_EXPR_ARRAYITEM ||
+            kind == ASR_DIALECT_OP_EXPR_ARRAYCONSTANT ||
+            kind == ASR_DIALECT_OP_EXPR_ARRAYCONSTRUCTOR) {
         return;
     }
 
