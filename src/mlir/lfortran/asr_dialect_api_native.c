@@ -2,6 +2,7 @@
 #include "asr_dialect_api.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <base/string.h>
 
@@ -156,9 +157,14 @@ bool ASR_DialectVerifyNative(MLIR_Context *ctx, MLIR_OpHandle module) {
     return true;
 }
 
+extern string ASR_DialectPrintPretty(MLIR_Context *ctx, MLIR_OpHandle module);
+
 string ASR_DialectPrintNative(MLIR_Context *ctx, MLIR_OpHandle module) {
-    (void)ctx;
-    return MLIR_PrintOperationGeneric(ctx, module);
+    const char *mode = getenv("LFORTRAN_ASR_DIALECT_DUMP");
+    if (mode && (strcmp(mode, "generic") == 0 || strcmp(mode, "debug") == 0)) {
+        return MLIR_PrintOperationGeneric(ctx, module);
+    }
+    return ASR_DialectPrintPretty(ctx, module);
 }
 
 // Lowering context and handlers live in asr_dialect_lowering_handlers.c

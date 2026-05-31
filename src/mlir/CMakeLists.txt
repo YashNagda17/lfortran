@@ -128,6 +128,7 @@ add_custom_command(
         ${LF_ASR_DIALECT_MLIR_GEN}/asr_dialect_api_generated.h
         ${LF_ASR_DIALECT_MLIR_GEN}/asr_dialect_ops.td.inc
         ${LF_ASR_DIALECT_MLIR_GEN}/asr_dialect_lowering_dispatch.inc
+        ${LF_ASR_DIALECT_MLIR_GEN}/asr_dialect_enum_print.inc
         ${LF_ASR_DIALECT_MLIR_GEN}/asr_dialect_coverage.csv
         ${LF_ASR_DIALECT_LFORTRAN_GEN}/asr_to_asr_dialect_visitor.inc
     COMMAND ${Python3_EXECUTABLE} ${LF_ASR_DIALECT_GEN}
@@ -144,6 +145,7 @@ add_custom_target(generate_asr_dialect
         ${LF_ASR_DIALECT_MLIR_GEN}/asr_dialect_api_generated.h
         ${LF_ASR_DIALECT_MLIR_GEN}/asr_dialect_ops.td.inc
         ${LF_ASR_DIALECT_MLIR_GEN}/asr_dialect_lowering_dispatch.inc
+        ${LF_ASR_DIALECT_MLIR_GEN}/asr_dialect_enum_print.inc
         ${LF_ASR_DIALECT_MLIR_GEN}/asr_dialect_coverage.csv
         ${LF_ASR_DIALECT_LFORTRAN_GEN}/asr_to_asr_dialect_visitor.inc
 )
@@ -151,6 +153,7 @@ add_custom_target(generate_asr_dialect
 add_library(lfortran_asr_dialect STATIC
     lfortran/asr_dialect_api.c
     lfortran/asr_dialect_api_native.c
+    lfortran/asr_dialect_pretty_print.c
     lfortran/asr_dialect_lowering_handlers.c
     lfortran/asr_dialect_api_upstream.cpp
 )

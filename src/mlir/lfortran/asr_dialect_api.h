@@ -61,6 +61,8 @@ bool ASR_DialectLowerToHighMLIR(
     MLIR_OpHandle asr_module,
     const ASR_DialectOptions *options);
 
+// Default: hybrid readable dump (alternative_2.md). Set LFORTRAN_ASR_DIALECT_DUMP=generic
+// for raw MLIR with asr.f.* handle attributes (debug only).
 string ASR_DialectPrint(MLIR_Context *ctx, MLIR_OpHandle module);
 
 bool ASR_LowerUnsupported(

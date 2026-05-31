@@ -95,7 +95,7 @@ The native backend stores `asr.*` ops as **unregistered MLIR ops** tagged with `
 | Generator | `src/libasr/asdl_to_asr_dialect.py` | ASDL → schema, API headers, ODS inc, visitor, lowering dispatch |
 | Generated | `src/mlir/generated/*`, `src/libasr/codegen/generated/*` | Committed outputs; regenerate when `ASR.asdl` changes |
 | C API | `src/mlir/lfortran/asr_dialect_api.{h,c}` | Stable boundary: create, verify, print, lower |
-| Native runtime | `asr_dialect_api_native.c`, `asr_dialect_lowering_handlers.c` | Op storage + semantic lowering to high MLIR |
+| Native runtime | `asr_dialect_api_native.c`, `asr_dialect_pretty_print.c`, `asr_dialect_lowering_handlers.c` | Op storage, hybrid dump, lowering to high MLIR |
 | Upstream stub | `asr_dialect_api_upstream.cpp` | `extern "C"` stubs → native (until ODS) |
 | Stage 1 emitter | `src/libasr/codegen/asr_to_asr_dialect.{h,cpp}` | Initial ASR → `asr.*` via `ASR_DialectCreateOp` |
 | Pipeline glue | `src/libasr/codegen/asr_to_mlir_new.cpp` | Thin wrapper: calls `asr_to_asr_dialect(Full)` |

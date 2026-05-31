@@ -1,5 +1,7 @@
 // Semantic lowering: ASR dialect ops -> func/memref/arith high-level MLIR (native).
+// Reads stored asr.f.* fields (hybrid dump is print-only; see asr_dialect_pretty_print.c).
 #include "asr_dialect_api.h"
+#include "asr_dialect_fields.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -40,35 +42,9 @@ static string arena_ssa(ASR_LoweringContext *lc) {
     return str_from_cstr_view(buf);
 }
 
-static MLIR_AttributeHandle get_attr(MLIR_OpHandle op, const char *field) {
-    char buf[128];
-    snprintf(buf, sizeof(buf), "asr.f.%s", field);
-    return MLIR_GetOpAttributeByName(op, buf);
-}
-
-static int64_t get_i64(MLIR_OpHandle op, const char *field, int64_t def) {
-    MLIR_AttributeHandle a = get_attr(op, field);
-    if (a == MLIR_INVALID_HANDLE) return def;
-    return MLIR_GetAttributeInteger(a);
-}
-
-static bool get_bool(MLIR_OpHandle op, const char *field, bool def) {
-    MLIR_AttributeHandle a = get_attr(op, field);
-    if (a == MLIR_INVALID_HANDLE) return def;
-    return MLIR_GetAttributeBool(a);
-}
-
-static string get_str(MLIR_OpHandle op, const char *field) {
-    MLIR_AttributeHandle a = get_attr(op, field);
-    if (a == MLIR_INVALID_HANDLE) return str_lit("");
-    return MLIR_GetAttributeString(a);
-}
-
-static MLIR_ValueHandle get_value_attr(MLIR_OpHandle op, const char *field) {
-    MLIR_AttributeHandle a = get_attr(op, field);
-    if (a == MLIR_INVALID_HANDLE) return MLIR_INVALID_HANDLE;
-    return (MLIR_ValueHandle)MLIR_GetAttributeInteger(a);
-}
+#define get_i64 asr_get_field_i64
+#define get_bool asr_get_field_bool
+#define get_str asr_get_field_str
 
 static ASR_SymSlot *lookup_sym(string name) {
     for (size_t i = 0; i < n_sym_slots; ++i) {
@@ -132,9 +108,7 @@ static MLIR_TypeHandle memref_ty(ASR_LoweringContext *lc, int64_t len) {
     return MLIR_CreateTypeMemref(lc->ctx, shape, 1, lc->i32_ty);
 }
 
-static MLIR_OpHandle get_op_ref(MLIR_OpHandle op, const char *field) {
-    return (MLIR_OpHandle)get_i64(op, field, 0);
-}
+#define get_op_ref asr_get_field_op
 
 static MLIR_ValueHandle lower_expr_value(ASR_LoweringContext *lc, MLIR_OpHandle op);
 static MLIR_ValueHandle lower_expr_i1(ASR_LoweringContext *lc, MLIR_OpHandle op);
