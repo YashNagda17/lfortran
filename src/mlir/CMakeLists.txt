@@ -153,6 +153,7 @@ add_custom_target(generate_asr_dialect
 add_library(lfortran_asr_dialect STATIC
     lfortran/asr_dialect_api.c
     lfortran/asr_dialect_api_native.c
+    lfortran/asr_dialect_emit_registry.c
     lfortran/asr_dialect_pretty_print.c
     lfortran/asr_dialect_lowering_handlers.c
     lfortran/asr_dialect_api_upstream.cpp
