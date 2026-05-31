@@ -1,5 +1,6 @@
 // Statement-first ASR dialect pretty printer (3_lfortran/alternative_2.md).
 #include "asr_dialect_api.h"
+#include "asr_dialect_emit_registry.h"
 #include "asr_dialect_fields.h"
 
 #include <stdarg.h>
@@ -354,8 +355,17 @@ static void pp_stmt(ASR_PpCtx *pp, MLIR_OpHandle op) {
         }
 
         pp->indent += ASR_PP_INDENT;
-        if (body != MLIR_INVALID_HANDLE) {
-            pp_stmt_block(pp, body);
+        {
+            size_t n_body = ASR_DialectEmitRegistryDoLoopBodyCount(op);
+            if (n_body > 0) {
+                for (size_t bi = 0; bi < n_body; ++bi) {
+                    MLIR_OpHandle body_stmt =
+                        ASR_DialectEmitRegistryDoLoopBodyOp(op, bi);
+                    pp_stmt_block(pp, body_stmt);
+                }
+            } else if (body != MLIR_INVALID_HANDLE) {
+                pp_stmt_block(pp, body);
+            }
         }
         pp->indent -= ASR_PP_INDENT;
 
