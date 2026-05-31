@@ -60,3 +60,27 @@ static inline MLIR_TypeHandle asr_get_field_type(MLIR_OpHandle op, const char *f
 static inline bool asr_field_attr_present(MLIR_OpHandle op, const char *field) {
     return asr_get_field_attr(op, field) != MLIR_INVALID_HANDLE;
 }
+
+static inline MLIR_OpHandle *asr_get_field_op_seq(MLIR_OpHandle op, const char *field) {
+    MLIR_AttributeHandle a = asr_get_field_attr(op, field);
+    if (a == MLIR_INVALID_HANDLE) {
+        return NULL;
+    }
+    return (MLIR_OpHandle *)(uintptr_t)MLIR_GetAttributeInteger(a);
+}
+
+static inline int64_t asr_get_array_len_attr(MLIR_OpHandle var_op) {
+    MLIR_AttributeHandle a = asr_get_field_attr(var_op, "array_len");
+    if (a == MLIR_INVALID_HANDLE) {
+        return 0;
+    }
+    return MLIR_GetAttributeInteger(a);
+}
+
+static inline size_t asr_get_seq_n_args_attr(MLIR_OpHandle op) {
+    MLIR_AttributeHandle a = asr_get_field_attr(op, "n_args");
+    if (a == MLIR_INVALID_HANDLE) {
+        return 0;
+    }
+    return (size_t)MLIR_GetAttributeInteger(a);
+}
