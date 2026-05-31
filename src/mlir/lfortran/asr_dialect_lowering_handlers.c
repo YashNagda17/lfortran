@@ -4,6 +4,7 @@
 #include "asr_dialect_emit_registry.h"
 #include "asr_dialect_fields.h"
 
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 #include <base/string.h>
@@ -401,7 +402,13 @@ static bool store_array_constructor(ASR_LoweringContext *lc, ASR_SymSlot *slot,
     if (!elems) {
         return false;
     }
-    size_t n = (size_t)slot->array_len;
+    size_t n = asr_get_seq_n_args_attr(ctor_op);
+    if (n == 0) {
+        n = (size_t)slot->array_len;
+    }
+    if (n > (size_t)slot->array_len) {
+        n = (size_t)slot->array_len;
+    }
     for (size_t i = 0; i < n; ++i) {
         MLIR_ValueHandle val = lower_expr_value(lc, elems[i]);
         if (val == MLIR_INVALID_HANDLE) {
@@ -412,8 +419,39 @@ static bool store_array_constructor(ASR_LoweringContext *lc, ASR_SymSlot *slot,
     return true;
 }
 
+static bool store_array_constant(ASR_LoweringContext *lc, ASR_SymSlot *slot,
+        MLIR_OpHandle const_op) {
+    int64_t n_data = get_i64(const_op, "n_data", 0);
+    intptr_t data_ptr = (intptr_t)get_i64(const_op, "data", 0);
+    if (data_ptr == 0 || n_data <= 0) {
+        return false;
+    }
+    int32_t *data = (int32_t *)(void *)data_ptr;
+    size_t n = (size_t)n_data;
+    if (n > (size_t)slot->array_len) {
+        n = (size_t)slot->array_len;
+    }
+    for (size_t i = 0; i < n; ++i) {
+        MLIR_ValueHandle val = emit_const_i32(lc, (int64_t)data[i]);
+        emit_memref_store_at(lc, val, slot, emit_const_index(lc, (int64_t)i));
+    }
+    return true;
+}
+
+static MLIR_OpHandle peel_assignment_value(MLIR_OpHandle value_op) {
+    while (value_op != MLIR_INVALID_HANDLE) {
+        ASR_DialectOpKind k = ASR_DialectGetOpKind(value_op);
+        if (k == ASR_DIALECT_OP_EXPR_CAST) {
+            value_op = get_op_ref(value_op, "arg");
+            continue;
+        }
+        break;
+    }
+    return value_op;
+}
+
 bool ASR_LowerAssignment(ASR_LoweringContext *lc, MLIR_OpHandle op) {
-    MLIR_OpHandle value_op = get_op_ref(op, "value");
+    MLIR_OpHandle value_op = peel_assignment_value(get_op_ref(op, "value"));
     MLIR_OpHandle target = get_op_ref(op, "target");
     ASR_DialectOpKind tk = ASR_DialectGetOpKind(target);
     ASR_DialectOpKind vk = ASR_DialectGetOpKind(value_op);
@@ -426,6 +464,9 @@ bool ASR_LowerAssignment(ASR_LoweringContext *lc, MLIR_OpHandle op) {
         }
         if (slot->is_array && vk == ASR_DIALECT_OP_EXPR_ARRAYCONSTRUCTOR) {
             return store_array_constructor(lc, slot, value_op);
+        }
+        if (slot->is_array && vk == ASR_DIALECT_OP_EXPR_ARRAYCONSTANT) {
+            return store_array_constant(lc, slot, value_op);
         }
         if (slot->is_array) {
             return ASR_LowerUnsupported(lc, op,
