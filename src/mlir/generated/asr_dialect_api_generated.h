@@ -4,6 +4,53 @@
 
 #include "asr_dialect_api.h"
 
+static inline MLIR_OpHandle ASR_Createalloc_argOp(
+        MLIR_Context *ctx,
+        MLIR_LocationHandle loc,
+        MLIR_OpHandle a,
+        MLIR_OpHandle *dims,
+        size_t n_dims,
+        MLIR_OpHandle len_expr,
+        MLIR_OpHandle sym_subclass,
+        MLIR_TypeHandle type) {
+    ASR_DialectField fields[5];
+    fields[0].kind = ASR_FIELD_EXPR;
+    fields[0].name = "a";
+    fields[0].value.op = a;
+    fields[1].kind = ASR_FIELD_OP_SEQ;
+    fields[1].name = "dims";
+    fields[1].value.op = dims;
+    fields[2].kind = ASR_FIELD_EXPR_OPT;
+    fields[2].name = "len_expr";
+    fields[2].value.op = len_expr;
+    fields[3].kind = ASR_FIELD_SYMBOL_OPT;
+    fields[3].name = "sym_subclass";
+    fields[3].value.op = sym_subclass;
+    fields[4].kind = ASR_FIELD_TTYPE_OPT;
+    fields[4].name = "type";
+    fields[4].value.type = type;
+    return ASR_DialectCreateOp(ctx, ASR_DIALECT_OP_ALLOC_ARG_ALLOC_ARG, loc, fields, 5);
+}
+
+static inline MLIR_OpHandle ASR_Createarray_indexOp(
+        MLIR_Context *ctx,
+        MLIR_LocationHandle loc,
+        MLIR_OpHandle left,
+        MLIR_OpHandle right,
+        MLIR_OpHandle step) {
+    ASR_DialectField fields[3];
+    fields[0].kind = ASR_FIELD_EXPR_OPT;
+    fields[0].name = "left";
+    fields[0].value.op = left;
+    fields[1].kind = ASR_FIELD_EXPR_OPT;
+    fields[1].name = "right";
+    fields[1].value.op = right;
+    fields[2].kind = ASR_FIELD_EXPR_OPT;
+    fields[2].name = "step";
+    fields[2].value.op = step;
+    return ASR_DialectCreateOp(ctx, ASR_DIALECT_OP_ARRAY_INDEX_ARRAY_INDEX, loc, fields, 3);
+}
+
 static inline MLIR_OpHandle ASR_CreateAttributeOp(
         MLIR_Context *ctx,
         MLIR_LocationHandle loc,
@@ -18,6 +65,28 @@ static inline MLIR_OpHandle ASR_CreateAttributeOp(
     fields[1].name = "args";
     fields[1].value.op = args;
     return ASR_DialectCreateOp(ctx, ASR_DIALECT_OP_ATTRIBUTE_ATTRIBUTE, loc, fields, 2);
+}
+
+static inline MLIR_OpHandle ASR_Createattribute_argOp(
+        MLIR_Context *ctx,
+        MLIR_LocationHandle loc,
+        string arg) {
+    ASR_DialectField fields[1];
+    fields[0].kind = ASR_FIELD_IDENTIFIER;
+    fields[0].name = "arg";
+    fields[0].value.str = arg;
+    return ASR_DialectCreateOp(ctx, ASR_DIALECT_OP_ATTRIBUTE_ARG_ATTRIBUTE_ARG, loc, fields, 1);
+}
+
+static inline MLIR_OpHandle ASR_Createcall_argOp(
+        MLIR_Context *ctx,
+        MLIR_LocationHandle loc,
+        MLIR_OpHandle value) {
+    ASR_DialectField fields[1];
+    fields[0].kind = ASR_FIELD_EXPR_OPT;
+    fields[0].name = "value";
+    fields[0].value.op = value;
+    return ASR_DialectCreateOp(ctx, ASR_DIALECT_OP_CALL_ARG_CALL_ARG, loc, fields, 1);
 }
 
 static inline MLIR_OpHandle ASR_CreateCaseStmtOp(
@@ -56,6 +125,63 @@ static inline MLIR_OpHandle ASR_CreateCaseStmt_RangeOp(
     fields[2].name = "body";
     fields[2].value.op = body;
     return ASR_DialectCreateOp(ctx, ASR_DIALECT_OP_CASE_STMT_CASESTMT_RANGE, loc, fields, 3);
+}
+
+static inline MLIR_OpHandle ASR_CreatecodimensionOp(
+        MLIR_Context *ctx,
+        MLIR_LocationHandle loc,
+        MLIR_OpHandle start,
+        MLIR_OpHandle end,
+        int64_t end_star) {
+    ASR_DialectField fields[3];
+    fields[0].kind = ASR_FIELD_EXPR_OPT;
+    fields[0].name = "start";
+    fields[0].value.op = start;
+    fields[1].kind = ASR_FIELD_EXPR_OPT;
+    fields[1].name = "end";
+    fields[1].value.op = end;
+    fields[2].kind = ASR_FIELD_I64;
+    fields[2].name = "end_star";
+    fields[2].value.i64 = end_star;
+    return ASR_DialectCreateOp(ctx, ASR_DIALECT_OP_CODIMENSION_CODIMENSION, loc, fields, 3);
+}
+
+static inline MLIR_OpHandle ASR_CreatedimensionOp(
+        MLIR_Context *ctx,
+        MLIR_LocationHandle loc,
+        MLIR_OpHandle start,
+        MLIR_OpHandle length) {
+    ASR_DialectField fields[2];
+    fields[0].kind = ASR_FIELD_EXPR_OPT;
+    fields[0].name = "start";
+    fields[0].value.op = start;
+    fields[1].kind = ASR_FIELD_EXPR_OPT;
+    fields[1].name = "length";
+    fields[1].value.op = length;
+    return ASR_DialectCreateOp(ctx, ASR_DIALECT_OP_DIMENSION_DIMENSION, loc, fields, 2);
+}
+
+static inline MLIR_OpHandle ASR_Createdo_loop_headOp(
+        MLIR_Context *ctx,
+        MLIR_LocationHandle loc,
+        MLIR_OpHandle v,
+        MLIR_OpHandle start,
+        MLIR_OpHandle end,
+        MLIR_OpHandle increment) {
+    ASR_DialectField fields[4];
+    fields[0].kind = ASR_FIELD_EXPR_OPT;
+    fields[0].name = "v";
+    fields[0].value.op = v;
+    fields[1].kind = ASR_FIELD_EXPR_OPT;
+    fields[1].name = "start";
+    fields[1].value.op = start;
+    fields[2].kind = ASR_FIELD_EXPR_OPT;
+    fields[2].name = "end";
+    fields[2].value.op = end;
+    fields[3].kind = ASR_FIELD_EXPR_OPT;
+    fields[3].name = "increment";
+    fields[3].value.op = increment;
+    return ASR_DialectCreateOp(ctx, ASR_DIALECT_OP_DO_LOOP_HEAD_DO_LOOP_HEAD, loc, fields, 4);
 }
 
 static inline MLIR_OpHandle ASR_CreateArrayBoundOp(
@@ -2928,6 +3054,21 @@ static inline MLIR_OpHandle ASR_CreateRankExprOp(
     fields[1].name = "body";
     fields[1].value.op = body;
     return ASR_DialectCreateOp(ctx, ASR_DIALECT_OP_RANK_STMT_RANKEXPR, loc, fields, 2);
+}
+
+static inline MLIR_OpHandle ASR_Createreduction_exprOp(
+        MLIR_Context *ctx,
+        MLIR_LocationHandle loc,
+        int64_t op,
+        MLIR_OpHandle arg) {
+    ASR_DialectField fields[2];
+    fields[0].kind = ASR_FIELD_I64;
+    fields[0].name = "op";
+    fields[0].value.i64 = op;
+    fields[1].kind = ASR_FIELD_EXPR;
+    fields[1].name = "arg";
+    fields[1].value.op = arg;
+    return ASR_DialectCreateOp(ctx, ASR_DIALECT_OP_REDUCTION_EXPR_REDUCTION_EXPR, loc, fields, 2);
 }
 
 static inline MLIR_OpHandle ASR_CreateRequireOp(

@@ -44,6 +44,11 @@ static MLIR_AttributeHandle field_to_attr(
         case ASR_FIELD_STMT:
         case ASR_FIELD_STMT_OPT:
         case ASR_FIELD_OP:
+        case ASR_FIELD_EXPR_SEQ:
+        case ASR_FIELD_STMT_SEQ:
+        case ASR_FIELD_SYMBOL_SEQ:
+        case ASR_FIELD_NODE_SEQ:
+        case ASR_FIELD_OP_SEQ:
             return MLIR_CreateAttributeInteger(ctx, aname, (int64_t)field->value.op,
                 MLIR_CreateTypeInteger(ctx, 64, false));
         default:

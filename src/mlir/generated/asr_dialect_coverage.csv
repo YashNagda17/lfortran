@@ -1,7 +1,14 @@
 category,name,kind,mlir_name,generated,emitted,lowered,test
+alloc_arg,alloc_arg,ASR_DIALECT_OP_ALLOC_ARG_ALLOC_ARG,asr.alloc_arg,yes,yes,unsupported,no
+array_index,array_index,ASR_DIALECT_OP_ARRAY_INDEX_ARRAY_INDEX,asr.array_index,yes,yes,unsupported,no
 attribute,Attribute,ASR_DIALECT_OP_ATTRIBUTE_ATTRIBUTE,asr.attribute,yes,yes,unsupported,no
+attribute_arg,attribute_arg,ASR_DIALECT_OP_ATTRIBUTE_ARG_ATTRIBUTE_ARG,asr.attribute_arg,yes,yes,unsupported,no
+call_arg,call_arg,ASR_DIALECT_OP_CALL_ARG_CALL_ARG,asr.call_arg,yes,yes,unsupported,no
 case_stmt,CaseStmt,ASR_DIALECT_OP_CASE_STMT_CASESTMT,asr.case_stmt,yes,yes,unsupported,no
 case_stmt,CaseStmt_Range,ASR_DIALECT_OP_CASE_STMT_CASESTMT_RANGE,asr.case_stmt__range,yes,yes,unsupported,no
+codimension,codimension,ASR_DIALECT_OP_CODIMENSION_CODIMENSION,asr.codimension,yes,yes,unsupported,no
+dimension,dimension,ASR_DIALECT_OP_DIMENSION_DIMENSION,asr.dimension,yes,yes,unsupported,no
+do_loop_head,do_loop_head,ASR_DIALECT_OP_DO_LOOP_HEAD_DO_LOOP_HEAD,asr.do_loop_head,yes,yes,unsupported,no
 expr,ArrayBound,ASR_DIALECT_OP_EXPR_ARRAYBOUND,asr.array_bound,yes,yes,implemented,focus
 expr,ArrayBroadcast,ASR_DIALECT_OP_EXPR_ARRAYBROADCAST,asr.array_broadcast,yes,yes,unsupported,no
 expr,ArrayConstant,ASR_DIALECT_OP_EXPR_ARRAYCONSTANT,asr.array_constant,yes,yes,implemented,focus
@@ -136,6 +143,7 @@ omp_clause,OMPSchedule,ASR_DIALECT_OP_OMP_CLAUSE_OMPSCHEDULE,asr.o_m_p_schedule,
 omp_clause,OMPShared,ASR_DIALECT_OP_OMP_CLAUSE_OMPSHARED,asr.o_m_p_shared,yes,yes,unsupported,no
 omp_clause,OMPThreadLimit,ASR_DIALECT_OP_OMP_CLAUSE_OMPTHREADLIMIT,asr.o_m_p_thread_limit,yes,yes,unsupported,no
 rank_stmt,RankExpr,ASR_DIALECT_OP_RANK_STMT_RANKEXPR,asr.rank_expr,yes,yes,unsupported,no
+reduction_expr,reduction_expr,ASR_DIALECT_OP_REDUCTION_EXPR_REDUCTION_EXPR,asr.reduction_expr,yes,yes,unsupported,no
 require_instantiation,Require,ASR_DIALECT_OP_REQUIRE_INSTANTIATION_REQUIRE,asr.require,yes,yes,unsupported,no
 stmt,Allocate,ASR_DIALECT_OP_STMT_ALLOCATE,asr.allocate,yes,yes,implemented,focus
 stmt,Assert,ASR_DIALECT_OP_STMT_ASSERT,asr.assert,yes,yes,unsupported,no
@@ -151,7 +159,7 @@ stmt,DictClear,ASR_DIALECT_OP_STMT_DICTCLEAR,asr.dict_clear,yes,yes,unsupported,
 stmt,DictInsert,ASR_DIALECT_OP_STMT_DICTINSERT,asr.dict_insert,yes,yes,unsupported,no
 stmt,DoConcurrentLoop,ASR_DIALECT_OP_STMT_DOCONCURRENTLOOP,asr.do_concurrent_loop,yes,yes,unsupported,no
 stmt,DoLoop,ASR_DIALECT_OP_STMT_DOLOOP,asr.do_loop,yes,yes,implemented,focus
-stmt,ErrorStop,ASR_DIALECT_OP_STMT_ERRORSTOP,asr.error_stop,yes,yes,unsupported,no
+stmt,ErrorStop,ASR_DIALECT_OP_STMT_ERRORSTOP,asr.error_stop,yes,yes,implemented,focus
 stmt,Exit,ASR_DIALECT_OP_STMT_EXIT,asr.exit,yes,yes,unsupported,no
 stmt,ExplicitDeallocate,ASR_DIALECT_OP_STMT_EXPLICITDEALLOCATE,asr.explicit_deallocate,yes,yes,unsupported,no
 stmt,Expr,ASR_DIALECT_OP_STMT_EXPR,asr.expr,yes,yes,unsupported,no

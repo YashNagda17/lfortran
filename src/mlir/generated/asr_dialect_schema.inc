@@ -3,9 +3,16 @@
 
 typedef enum {
     ASR_DIALECT_OP_INVALID = 0,
+    ASR_DIALECT_OP_ALLOC_ARG_ALLOC_ARG,
+    ASR_DIALECT_OP_ARRAY_INDEX_ARRAY_INDEX,
     ASR_DIALECT_OP_ATTRIBUTE_ATTRIBUTE,
+    ASR_DIALECT_OP_ATTRIBUTE_ARG_ATTRIBUTE_ARG,
+    ASR_DIALECT_OP_CALL_ARG_CALL_ARG,
     ASR_DIALECT_OP_CASE_STMT_CASESTMT,
     ASR_DIALECT_OP_CASE_STMT_CASESTMT_RANGE,
+    ASR_DIALECT_OP_CODIMENSION_CODIMENSION,
+    ASR_DIALECT_OP_DIMENSION_DIMENSION,
+    ASR_DIALECT_OP_DO_LOOP_HEAD_DO_LOOP_HEAD,
     ASR_DIALECT_OP_EXPR_ARRAYBOUND,
     ASR_DIALECT_OP_EXPR_ARRAYBROADCAST,
     ASR_DIALECT_OP_EXPR_ARRAYCONSTANT,
@@ -140,6 +147,7 @@ typedef enum {
     ASR_DIALECT_OP_OMP_CLAUSE_OMPSHARED,
     ASR_DIALECT_OP_OMP_CLAUSE_OMPTHREADLIMIT,
     ASR_DIALECT_OP_RANK_STMT_RANKEXPR,
+    ASR_DIALECT_OP_REDUCTION_EXPR_REDUCTION_EXPR,
     ASR_DIALECT_OP_REQUIRE_INSTANTIATION_REQUIRE,
     ASR_DIALECT_OP_STMT_ALLOCATE,
     ASR_DIALECT_OP_STMT_ASSERT,
@@ -286,9 +294,31 @@ typedef struct {
     const ASR_DialectFieldDesc *fields;
 } ASR_DialectOpSchema;
 
+static const ASR_DialectFieldDesc ASR_DIALECT_OP_ALLOC_ARG_ALLOC_ARG_FIELDS[] = {
+    {"a", ASR_FIELD_EXPR, ASR_FIELD_REQUIRED},
+    {"dims", ASR_FIELD_OP_SEQ, ASR_FIELD_REQUIRED},
+    {"len_expr", ASR_FIELD_EXPR_OPT, ASR_FIELD_OPTIONAL},
+    {"sym_subclass", ASR_FIELD_SYMBOL_OPT, ASR_FIELD_OPTIONAL},
+    {"type", ASR_FIELD_TTYPE_OPT, ASR_FIELD_OPTIONAL},
+};
+
+static const ASR_DialectFieldDesc ASR_DIALECT_OP_ARRAY_INDEX_ARRAY_INDEX_FIELDS[] = {
+    {"left", ASR_FIELD_EXPR_OPT, ASR_FIELD_OPTIONAL},
+    {"right", ASR_FIELD_EXPR_OPT, ASR_FIELD_OPTIONAL},
+    {"step", ASR_FIELD_EXPR_OPT, ASR_FIELD_OPTIONAL},
+};
+
 static const ASR_DialectFieldDesc ASR_DIALECT_OP_ATTRIBUTE_ATTRIBUTE_FIELDS[] = {
     {"name", ASR_FIELD_IDENTIFIER, ASR_FIELD_REQUIRED},
     {"args", ASR_FIELD_OP_SEQ, ASR_FIELD_REQUIRED},
+};
+
+static const ASR_DialectFieldDesc ASR_DIALECT_OP_ATTRIBUTE_ARG_ATTRIBUTE_ARG_FIELDS[] = {
+    {"arg", ASR_FIELD_IDENTIFIER, ASR_FIELD_REQUIRED},
+};
+
+static const ASR_DialectFieldDesc ASR_DIALECT_OP_CALL_ARG_CALL_ARG_FIELDS[] = {
+    {"value", ASR_FIELD_EXPR_OPT, ASR_FIELD_OPTIONAL},
 };
 
 static const ASR_DialectFieldDesc ASR_DIALECT_OP_CASE_STMT_CASESTMT_FIELDS[] = {
@@ -301,6 +331,24 @@ static const ASR_DialectFieldDesc ASR_DIALECT_OP_CASE_STMT_CASESTMT_RANGE_FIELDS
     {"start", ASR_FIELD_EXPR_OPT, ASR_FIELD_OPTIONAL},
     {"end", ASR_FIELD_EXPR_OPT, ASR_FIELD_OPTIONAL},
     {"body", ASR_FIELD_STMT_SEQ, ASR_FIELD_REQUIRED},
+};
+
+static const ASR_DialectFieldDesc ASR_DIALECT_OP_CODIMENSION_CODIMENSION_FIELDS[] = {
+    {"start", ASR_FIELD_EXPR_OPT, ASR_FIELD_OPTIONAL},
+    {"end", ASR_FIELD_EXPR_OPT, ASR_FIELD_OPTIONAL},
+    {"end_star", ASR_FIELD_I64, ASR_FIELD_REQUIRED},
+};
+
+static const ASR_DialectFieldDesc ASR_DIALECT_OP_DIMENSION_DIMENSION_FIELDS[] = {
+    {"start", ASR_FIELD_EXPR_OPT, ASR_FIELD_OPTIONAL},
+    {"length", ASR_FIELD_EXPR_OPT, ASR_FIELD_OPTIONAL},
+};
+
+static const ASR_DialectFieldDesc ASR_DIALECT_OP_DO_LOOP_HEAD_DO_LOOP_HEAD_FIELDS[] = {
+    {"v", ASR_FIELD_EXPR_OPT, ASR_FIELD_OPTIONAL},
+    {"start", ASR_FIELD_EXPR_OPT, ASR_FIELD_OPTIONAL},
+    {"end", ASR_FIELD_EXPR_OPT, ASR_FIELD_OPTIONAL},
+    {"increment", ASR_FIELD_EXPR_OPT, ASR_FIELD_OPTIONAL},
 };
 
 static const ASR_DialectFieldDesc ASR_DIALECT_OP_EXPR_ARRAYBOUND_FIELDS[] = {
@@ -1187,6 +1235,11 @@ static const ASR_DialectFieldDesc ASR_DIALECT_OP_RANK_STMT_RANKEXPR_FIELDS[] = {
     {"body", ASR_FIELD_STMT_SEQ, ASR_FIELD_REQUIRED},
 };
 
+static const ASR_DialectFieldDesc ASR_DIALECT_OP_REDUCTION_EXPR_REDUCTION_EXPR_FIELDS[] = {
+    {"op", ASR_FIELD_I64, ASR_FIELD_REQUIRED},
+    {"arg", ASR_FIELD_EXPR, ASR_FIELD_REQUIRED},
+};
+
 static const ASR_DialectFieldDesc ASR_DIALECT_OP_REQUIRE_INSTANTIATION_REQUIRE_FIELDS[] = {
     {"name", ASR_FIELD_IDENTIFIER, ASR_FIELD_REQUIRED},
     {"args", ASR_FIELD_IDENTIFIER_SEQ, ASR_FIELD_REQUIRED},
@@ -1898,12 +1951,44 @@ static const ASR_DialectFieldDesc ASR_DIALECT_OP_UNIT_TRANSLATIONUNIT_FIELDS[] =
 
 static const ASR_DialectOpSchema ASR_DIALECT_SCHEMA[] = {
     {
+        .kind = ASR_DIALECT_OP_ALLOC_ARG_ALLOC_ARG,
+        .category = ASR_DIALECT_CATEGORY_PRODUCT,
+        .asr_name = "alloc_arg",
+        .mlir_name = "asr.alloc_arg",
+        .n_fields = 5,
+        .fields = ASR_DIALECT_OP_ALLOC_ARG_ALLOC_ARG_FIELDS,
+    },
+    {
+        .kind = ASR_DIALECT_OP_ARRAY_INDEX_ARRAY_INDEX,
+        .category = ASR_DIALECT_CATEGORY_PRODUCT,
+        .asr_name = "array_index",
+        .mlir_name = "asr.array_index",
+        .n_fields = 3,
+        .fields = ASR_DIALECT_OP_ARRAY_INDEX_ARRAY_INDEX_FIELDS,
+    },
+    {
         .kind = ASR_DIALECT_OP_ATTRIBUTE_ATTRIBUTE,
         .category = ASR_DIALECT_CATEGORY_PRODUCT,
         .asr_name = "Attribute",
         .mlir_name = "asr.attribute",
         .n_fields = 2,
         .fields = ASR_DIALECT_OP_ATTRIBUTE_ATTRIBUTE_FIELDS,
+    },
+    {
+        .kind = ASR_DIALECT_OP_ATTRIBUTE_ARG_ATTRIBUTE_ARG,
+        .category = ASR_DIALECT_CATEGORY_PRODUCT,
+        .asr_name = "attribute_arg",
+        .mlir_name = "asr.attribute_arg",
+        .n_fields = 1,
+        .fields = ASR_DIALECT_OP_ATTRIBUTE_ARG_ATTRIBUTE_ARG_FIELDS,
+    },
+    {
+        .kind = ASR_DIALECT_OP_CALL_ARG_CALL_ARG,
+        .category = ASR_DIALECT_CATEGORY_PRODUCT,
+        .asr_name = "call_arg",
+        .mlir_name = "asr.call_arg",
+        .n_fields = 1,
+        .fields = ASR_DIALECT_OP_CALL_ARG_CALL_ARG_FIELDS,
     },
     {
         .kind = ASR_DIALECT_OP_CASE_STMT_CASESTMT,
@@ -1920,6 +2005,30 @@ static const ASR_DialectOpSchema ASR_DIALECT_SCHEMA[] = {
         .mlir_name = "asr.case_stmt__range",
         .n_fields = 3,
         .fields = ASR_DIALECT_OP_CASE_STMT_CASESTMT_RANGE_FIELDS,
+    },
+    {
+        .kind = ASR_DIALECT_OP_CODIMENSION_CODIMENSION,
+        .category = ASR_DIALECT_CATEGORY_PRODUCT,
+        .asr_name = "codimension",
+        .mlir_name = "asr.codimension",
+        .n_fields = 3,
+        .fields = ASR_DIALECT_OP_CODIMENSION_CODIMENSION_FIELDS,
+    },
+    {
+        .kind = ASR_DIALECT_OP_DIMENSION_DIMENSION,
+        .category = ASR_DIALECT_CATEGORY_PRODUCT,
+        .asr_name = "dimension",
+        .mlir_name = "asr.dimension",
+        .n_fields = 2,
+        .fields = ASR_DIALECT_OP_DIMENSION_DIMENSION_FIELDS,
+    },
+    {
+        .kind = ASR_DIALECT_OP_DO_LOOP_HEAD_DO_LOOP_HEAD,
+        .category = ASR_DIALECT_CATEGORY_PRODUCT,
+        .asr_name = "do_loop_head",
+        .mlir_name = "asr.do_loop_head",
+        .n_fields = 4,
+        .fields = ASR_DIALECT_OP_DO_LOOP_HEAD_DO_LOOP_HEAD_FIELDS,
     },
     {
         .kind = ASR_DIALECT_OP_EXPR_ARRAYBOUND,
@@ -2992,6 +3101,14 @@ static const ASR_DialectOpSchema ASR_DIALECT_SCHEMA[] = {
         .mlir_name = "asr.rank_expr",
         .n_fields = 2,
         .fields = ASR_DIALECT_OP_RANK_STMT_RANKEXPR_FIELDS,
+    },
+    {
+        .kind = ASR_DIALECT_OP_REDUCTION_EXPR_REDUCTION_EXPR,
+        .category = ASR_DIALECT_CATEGORY_PRODUCT,
+        .asr_name = "reduction_expr",
+        .mlir_name = "asr.reduction_expr",
+        .n_fields = 2,
+        .fields = ASR_DIALECT_OP_REDUCTION_EXPR_REDUCTION_EXPR_FIELDS,
     },
     {
         .kind = ASR_DIALECT_OP_REQUIRE_INSTANTIATION_REQUIRE,

@@ -85,11 +85,27 @@ static ASR_DialectField op_field(const char *name, MLIR_OpHandle op) {
     return f;
 }
 
-static ASR_DialectField stmt_field(const char *name, MLIR_OpHandle op) {
+static ASR_DialectField op_opt_field(const char *name, MLIR_OpHandle op) {
     ASR_DialectField f{};
-    f.kind = ASR_FIELD_STMT;
+    f.kind = ASR_FIELD_EXPR_OPT;
     f.name = name;
     f.value.op = op;
+    return f;
+}
+
+static ASR_DialectField stmt_seq_field(const char *name, MLIR_OpHandle op) {
+    ASR_DialectField f{};
+    f.kind = ASR_FIELD_STMT_SEQ;
+    f.name = name;
+    f.value.op = op;
+    return f;
+}
+
+static ASR_DialectField id_opt_field(const char *name, string v) {
+    ASR_DialectField f{};
+    f.kind = ASR_FIELD_IDENTIFIER_OPT;
+    f.name = name;
+    f.value.str = v;
     return f;
 }
 
@@ -187,11 +203,85 @@ public:
             return create_op(ASR_DIALECT_OP_EXPR_INTEGERBINOP,
                 default_loc(), fields, 4);
         }
+        if (ASR::is_a<ASR::IntegerCompare_t>(e)) {
+            const ASR::IntegerCompare_t &x =
+                *ASR::down_cast<ASR::IntegerCompare_t>(&e);
+            MLIR_OpHandle left = emit_expr_op(*x.m_left);
+            MLIR_OpHandle right = emit_expr_op(*x.m_right);
+            ASR_DialectField fields[4] = {
+                op_field("left", left),
+                i64_field("op", (int64_t)x.m_op),
+                op_field("right", right),
+                type_field("type", convert_type(*x.m_type)),
+            };
+            return create_op(ASR_DIALECT_OP_EXPR_INTEGERCOMPARE,
+                default_loc(), fields, 4);
+        }
         throw AsrDialectError(
             "asr dialect: expression kind not supported yet", e.base.loc);
     }
 
-    void emit_stmt(ASR::stmt_t &s) {
+    MLIR_OpHandle emit_print_op(ASR::expr_t &text_expr) {
+        MLIR_OpHandle text = emit_expr_op(text_expr);
+        ASR_DialectField fields[1] = {op_field("text", text)};
+        return create_op(ASR_DIALECT_OP_STMT_PRINT, default_loc(), fields, 1);
+    }
+
+    void emit_print_stmts(const ASR::Print_t &x) {
+        if (!x.m_text) {
+            throw AsrDialectError(
+                "asr dialect: print with no format expression", x.base.base.loc);
+        }
+        if (ASR::is_a<ASR::StringFormat_t>(*x.m_text)) {
+            const ASR::StringFormat_t &sf =
+                *ASR::down_cast<ASR::StringFormat_t>(x.m_text);
+            for (size_t i = 0; i < sf.n_args; i++) {
+                append_module(emit_print_op(*sf.m_args[i]));
+            }
+            return;
+        }
+        append_module(emit_print_op(*x.m_text));
+    }
+
+    MLIR_OpHandle emit_do_loop_head(const ASR::do_loop_head_t &h) {
+        MLIR_OpHandle v = MLIR_INVALID_HANDLE;
+        MLIR_OpHandle start = MLIR_INVALID_HANDLE;
+        MLIR_OpHandle end = MLIR_INVALID_HANDLE;
+        MLIR_OpHandle increment = MLIR_INVALID_HANDLE;
+        if (h.m_v) {
+            v = emit_expr_op(*h.m_v);
+        }
+        if (h.m_start) {
+            start = emit_expr_op(*h.m_start);
+        }
+        if (h.m_end) {
+            end = emit_expr_op(*h.m_end);
+        }
+        if (h.m_increment) {
+            increment = emit_expr_op(*h.m_increment);
+        }
+        ASR_DialectField fields[4] = {
+            op_opt_field("v", v),
+            op_opt_field("start", start),
+            op_opt_field("end", end),
+            op_opt_field("increment", increment),
+        };
+        return create_op(ASR_DIALECT_OP_DO_LOOP_HEAD_DO_LOOP_HEAD,
+            default_loc(), fields, 4);
+    }
+
+    MLIR_OpHandle emit_stmt_seq_op(ASR::stmt_t **stmts, size_t n) {
+        if (n == 0) {
+            return MLIR_INVALID_HANDLE;
+        }
+        if (n == 1) {
+            return emit_stmt_op(*stmts[0]);
+        }
+        throw AsrDialectError(
+            "asr dialect: multi-statement sequences not supported yet");
+    }
+
+    MLIR_OpHandle emit_stmt_op(ASR::stmt_t &s) {
         if (ASR::is_a<ASR::Assignment_t>(s)) {
             const ASR::Assignment_t &x =
                 *ASR::down_cast<ASR::Assignment_t>(&s);
@@ -203,27 +293,87 @@ public:
                 bool_field("realloc_lhs", x.m_realloc_lhs),
                 bool_field("move_allocation", x.m_move_allocation),
             };
-            MLIR_OpHandle op = create_op(ASR_DIALECT_OP_STMT_ASSIGNMENT,
+            return create_op(ASR_DIALECT_OP_STMT_ASSIGNMENT,
                 default_loc(), fields, 4);
-            append_module(op);
-            return;
         }
         if (ASR::is_a<ASR::Print_t>(s)) {
             const ASR::Print_t &x = *ASR::down_cast<ASR::Print_t>(&s);
-            MLIR_OpHandle text = emit_expr_op(*x.m_text);
-            ASR_DialectField fields[1] = {op_field("text", text)};
-            append_module(create_op(ASR_DIALECT_OP_STMT_PRINT,
-                default_loc(), fields, 1));
-            return;
+            if (!x.m_text) {
+                throw AsrDialectError(
+                    "asr dialect: print with no format expression", s.base.loc);
+            }
+            if (ASR::is_a<ASR::StringFormat_t>(*x.m_text)) {
+                const ASR::StringFormat_t &sf =
+                    *ASR::down_cast<ASR::StringFormat_t>(x.m_text);
+                if (sf.n_args != 1) {
+                    throw AsrDialectError(
+                        "asr dialect: print with multiple values in nested "
+                        "statement not supported yet",
+                        s.base.loc);
+                }
+                return emit_print_op(*sf.m_args[0]);
+            }
+            return emit_print_op(*x.m_text);
         }
         if (ASR::is_a<ASR::Return_t>(s)) {
-            append_module(create_op(ASR_DIALECT_OP_STMT_RETURN,
-                default_loc(), nullptr, 0));
-            block_terminated = true;
-            return;
+            return create_op(ASR_DIALECT_OP_STMT_RETURN,
+                default_loc(), nullptr, 0);
+        }
+        if (ASR::is_a<ASR::DoLoop_t>(s)) {
+            const ASR::DoLoop_t &x = *ASR::down_cast<ASR::DoLoop_t>(&s);
+            if (x.n_orelse > 0) {
+                throw AsrDialectError(
+                    "asr dialect: do-loop else not supported yet", s.base.loc);
+            }
+            MLIR_OpHandle head = emit_do_loop_head(x.m_head);
+            MLIR_OpHandle body = emit_stmt_seq_op(x.m_body, x.n_body);
+            ASR_DialectField fields[4] = {
+                id_opt_field("name", asr_cstr(x.m_name)),
+                op_field("head", head),
+                stmt_seq_field("body", body),
+                stmt_seq_field("orelse", MLIR_INVALID_HANDLE),
+            };
+            return create_op(ASR_DIALECT_OP_STMT_DOLOOP,
+                default_loc(), fields, 4);
+        }
+        if (ASR::is_a<ASR::If_t>(s)) {
+            const ASR::If_t &x = *ASR::down_cast<ASR::If_t>(&s);
+            MLIR_OpHandle test = emit_expr_op(*x.m_test);
+            MLIR_OpHandle body = emit_stmt_seq_op(x.m_body, x.n_body);
+            MLIR_OpHandle orelse = emit_stmt_seq_op(x.m_orelse, x.n_orelse);
+            ASR_DialectField fields[4] = {
+                id_opt_field("name", asr_cstr(x.m_name)),
+                op_field("test", test),
+                stmt_seq_field("body", body),
+                stmt_seq_field("orelse", orelse),
+            };
+            return create_op(ASR_DIALECT_OP_STMT_IF,
+                default_loc(), fields, 4);
+        }
+        if (ASR::is_a<ASR::ErrorStop_t>(s)) {
+            const ASR::ErrorStop_t &x = *ASR::down_cast<ASR::ErrorStop_t>(&s);
+            MLIR_OpHandle code = MLIR_INVALID_HANDLE;
+            if (x.m_code) {
+                code = emit_expr_op(*x.m_code);
+            }
+            ASR_DialectField fields[1] = {op_opt_field("code", code)};
+            return create_op(ASR_DIALECT_OP_STMT_ERRORSTOP,
+                default_loc(), fields, 1);
         }
         throw AsrDialectError(
             "asr dialect: statement not supported yet", s.base.loc);
+    }
+
+    void emit_stmt(ASR::stmt_t &s) {
+        if (ASR::is_a<ASR::Print_t>(s)) {
+            emit_print_stmts(*ASR::down_cast<ASR::Print_t>(&s));
+            return;
+        }
+        MLIR_OpHandle op = emit_stmt_op(s);
+        append_module(op);
+        if (ASR::is_a<ASR::Return_t>(s) || ASR::is_a<ASR::ErrorStop_t>(s)) {
+            block_terminated = true;
+        }
     }
 
     void visit_Program(const ASR::Program_t &x) {

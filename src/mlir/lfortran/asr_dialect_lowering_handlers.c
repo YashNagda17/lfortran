@@ -137,6 +137,123 @@ static MLIR_OpHandle get_op_ref(MLIR_OpHandle op, const char *field) {
 }
 
 static MLIR_ValueHandle lower_expr_value(ASR_LoweringContext *lc, MLIR_OpHandle op);
+static MLIR_ValueHandle lower_expr_i1(ASR_LoweringContext *lc, MLIR_OpHandle op);
+static bool lower_stmt_ref(ASR_LoweringContext *lc, MLIR_OpHandle stmt_op);
+bool ASR_DialectLowerOneOp(ASR_LoweringContext *ctx, MLIR_OpHandle op);
+
+static MLIR_BlockHandle new_cfg_block(ASR_LoweringContext *lc) {
+    MLIR_BlockHandle b = MLIR_CreateBlock(lc->ctx);
+    MLIR_AppendRegionBlock(lc->ctx, lc->fn_region, b);
+    return b;
+}
+
+static MLIR_OpHandle emit_branch_op(ASR_LoweringContext *lc, string opname, MLIR_OpType ty,
+        MLIR_ValueHandle *operands, size_t n_operands,
+        MLIR_BlockHandle *successors, size_t n_successors) {
+    MLIR_ValueHandle **sops = NULL;
+    size_t *sn = NULL;
+    if (n_successors > 0) {
+        sops = (MLIR_ValueHandle **)arena_alloc(
+            lc->ctx->arena, n_successors * sizeof(MLIR_ValueHandle *));
+        sn = (size_t *)arena_alloc(lc->ctx->arena, n_successors * sizeof(size_t));
+        for (size_t i = 0; i < n_successors; ++i) {
+            sops[i] = NULL;
+            sn[i] = 0;
+        }
+    }
+    return MLIR_CreateOpWithSuccessors(lc->ctx, ty, opname,
+        NULL, 0, NULL, 0, NULL, 0, operands, n_operands,
+        NULL, 0, successors, n_successors, sops, sn,
+        lc->loc, MLIR_INVALID_HANDLE, str_lit(""), -1);
+}
+
+static void emit_branch(ASR_LoweringContext *lc, MLIR_BlockHandle target) {
+    if (lc->block_terminated) {
+        return;
+    }
+    MLIR_BlockHandle succs[1] = {target};
+    append_current(lc, emit_branch_op(lc, str_lit("cf.br"), OP_TYPE_CF_BR,
+        NULL, 0, succs, 1));
+    lc->block_terminated = true;
+}
+
+static void emit_cond_branch(ASR_LoweringContext *lc, MLIR_ValueHandle cond,
+        MLIR_BlockHandle true_b, MLIR_BlockHandle false_b) {
+    if (lc->block_terminated) {
+        return;
+    }
+    MLIR_ValueHandle ops[1] = {cond};
+    MLIR_BlockHandle succs[2] = {true_b, false_b};
+    append_current(lc, emit_branch_op(lc, str_lit("cf.cond_br"), OP_TYPE_CF_COND_BR,
+        ops, 1, succs, 2));
+    lc->block_terminated = true;
+}
+
+static int64_t icmp_predicate_for(int64_t cmpop) {
+    switch (cmpop) {
+        case 0: return 0; /* Eq */
+        case 1: return 1; /* NotEq */
+        case 2: return 2; /* Lt */
+        case 3: return 3; /* LtE */
+        case 4: return 4; /* Gt */
+        case 5: return 5; /* GtE */
+        default: return -1;
+    }
+}
+
+static MLIR_ValueHandle emit_memref_load_scalar(ASR_LoweringContext *lc,
+        ASR_SymSlot *slot) {
+    MLIR_ValueHandle idx = emit_const_index(lc, 0);
+    MLIR_ValueHandle res = MLIR_CreateValueOpResult(lc->ctx, MLIR_INVALID_HANDLE,
+        0, lc->i32_ty, arena_ssa(lc), lc->loc);
+    MLIR_TypeHandle rts[1] = {lc->i32_ty};
+    MLIR_ValueHandle rs[1] = {res};
+    MLIR_ValueHandle ops[2] = {slot->memref, idx};
+    append_current(lc, emit_op(lc, OP_TYPE_MEMREF_LOAD, str_lit("memref.load"),
+        NULL, 0, rts, 1, rs, 1, ops, 2));
+    return res;
+}
+
+static void emit_memref_store_scalar(ASR_LoweringContext *lc, MLIR_ValueHandle val,
+        ASR_SymSlot *slot) {
+    MLIR_ValueHandle idx = emit_const_index(lc, 0);
+    MLIR_ValueHandle ops[3] = {val, slot->memref, idx};
+    append_current(lc, emit_op(lc, OP_TYPE_MEMREF_STORE, str_lit("memref.store"),
+        NULL, 0, NULL, 0, NULL, 0, ops, 3));
+}
+
+static MLIR_ValueHandle emit_icmp_i32(ASR_LoweringContext *lc, int64_t predicate,
+        MLIR_ValueHandle a, MLIR_ValueHandle b) {
+    MLIR_ValueHandle res = MLIR_CreateValueOpResult(lc->ctx, MLIR_INVALID_HANDLE,
+        0, lc->i1_ty, arena_ssa(lc), lc->loc);
+    MLIR_TypeHandle rts[1] = {lc->i1_ty};
+    MLIR_ValueHandle rs[1] = {res};
+    MLIR_ValueHandle ops[2] = {a, b};
+    MLIR_AttributeHandle pred = MLIR_CreateAttributeInteger(lc->ctx,
+        str_lit("predicate"), predicate, lc->i64_ty);
+    MLIR_AttributeHandle as[1] = {pred};
+    append_current(lc, emit_op(lc, OP_TYPE_ARITH_CMPI, str_lit("arith.cmpi"),
+        as, 1, rts, 1, rs, 1, ops, 2));
+    return res;
+}
+
+static MLIR_ValueHandle emit_binop_i32(ASR_LoweringContext *lc, MLIR_OpType ty,
+        string nm, MLIR_ValueHandle a, MLIR_ValueHandle b) {
+    MLIR_ValueHandle res = MLIR_CreateValueOpResult(lc->ctx, MLIR_INVALID_HANDLE,
+        0, lc->i32_ty, arena_ssa(lc), lc->loc);
+    MLIR_TypeHandle rts[1] = {lc->i32_ty};
+    MLIR_ValueHandle rs[1] = {res};
+    MLIR_ValueHandle ops[2] = {a, b};
+    append_current(lc, emit_op(lc, ty, nm, NULL, 0, rts, 1, rs, 1, ops, 2));
+    return res;
+}
+
+static bool lower_stmt_ref(ASR_LoweringContext *lc, MLIR_OpHandle stmt_op) {
+    if (stmt_op == MLIR_INVALID_HANDLE) {
+        return true;
+    }
+    return ASR_DialectLowerOneOp(lc, stmt_op);
+}
 
 bool ASR_LowerIntegerConstant(ASR_LoweringContext *lc, MLIR_OpHandle op) {
     int64_t n = get_i64(op, "n", 0);
@@ -301,6 +418,25 @@ static MLIR_ValueHandle lower_expr_value(ASR_LoweringContext *lc, MLIR_OpHandle 
     }
 }
 
+static MLIR_ValueHandle lower_expr_i1(ASR_LoweringContext *lc, MLIR_OpHandle op) {
+    if (op == MLIR_INVALID_HANDLE) {
+        return MLIR_INVALID_HANDLE;
+    }
+    ASR_DialectOpKind kind = ASR_DialectGetOpKind(op);
+    if (kind == ASR_DIALECT_OP_EXPR_INTEGERCOMPARE) {
+        MLIR_ValueHandle lhs = lower_expr_value(lc, get_op_ref(op, "left"));
+        MLIR_ValueHandle rhs = lower_expr_value(lc, get_op_ref(op, "right"));
+        int64_t pred = icmp_predicate_for(get_i64(op, "op", 0));
+        if (pred < 0) {
+            ASR_LowerUnsupported(lc, op, "IntegerCompare: unsupported cmpop");
+            return MLIR_INVALID_HANDLE;
+        }
+        return emit_icmp_i32(lc, pred, lhs, rhs);
+    }
+    ASR_LowerUnsupported(lc, op, "boolean expression lowering not implemented");
+    return MLIR_INVALID_HANDLE;
+}
+
 static void init_types(ASR_LoweringContext *lc) {
     lc->i32_ty = MLIR_CreateTypeInteger(lc->ctx, 32, true);
     lc->i64_ty = MLIR_CreateTypeInteger(lc->ctx, 64, false);
@@ -312,7 +448,8 @@ static void init_types(ASR_LoweringContext *lc) {
 
 // Stub handlers for remaining focused ops (expand incrementally).
 bool ASR_LowerIntegerCompare(ASR_LoweringContext *lc, MLIR_OpHandle op) {
-    return ASR_LowerUnsupported(lc, op, "IntegerCompare lowering pending");
+    (void)lower_expr_i1(lc, op);
+    return true;
 }
 bool ASR_LowerIntegerUnaryMinus(ASR_LoweringContext *lc, MLIR_OpHandle op) {
     return ASR_LowerUnsupported(lc, op, "IntegerUnaryMinus lowering pending");
@@ -390,10 +527,115 @@ bool ASR_LowerAllocate(ASR_LoweringContext *lc, MLIR_OpHandle op) {
     return ASR_LowerUnsupported(lc, op, "Allocate lowering pending");
 }
 bool ASR_LowerDoLoop(ASR_LoweringContext *lc, MLIR_OpHandle op) {
-    return ASR_LowerUnsupported(lc, op, "DoLoop lowering pending");
+    MLIR_OpHandle head_op = get_op_ref(op, "head");
+    if (head_op == MLIR_INVALID_HANDLE) {
+        return ASR_LowerUnsupported(lc, op, "DoLoop: missing head");
+    }
+    MLIR_OpHandle v_op = get_op_ref(head_op, "v");
+    MLIR_OpHandle start_op = get_op_ref(head_op, "start");
+    MLIR_OpHandle end_op = get_op_ref(head_op, "end");
+    MLIR_OpHandle inc_op = get_op_ref(head_op, "increment");
+    if (v_op == MLIR_INVALID_HANDLE || start_op == MLIR_INVALID_HANDLE ||
+            end_op == MLIR_INVALID_HANDLE) {
+        return ASR_LowerUnsupported(lc, op, "DoLoop: incomplete head");
+    }
+    if (ASR_DialectGetOpKind(v_op) != ASR_DIALECT_OP_EXPR_VAR) {
+        return ASR_LowerUnsupported(lc, op, "DoLoop: index must be a variable");
+    }
+    string sym = get_str(v_op, "v");
+    ASR_SymSlot *slot = lookup_sym(sym);
+    if (!slot || slot->is_array) {
+        return ASR_LowerUnsupported(lc, op, "DoLoop: scalar loop variable required");
+    }
+
+    MLIR_ValueHandle start_v = lower_expr_value(lc, start_op);
+    emit_memref_store_scalar(lc, start_v, slot);
+
+    MLIR_BlockHandle header_b = new_cfg_block(lc);
+    MLIR_BlockHandle body_b = new_cfg_block(lc);
+    MLIR_BlockHandle step_b = new_cfg_block(lc);
+    MLIR_BlockHandle exit_b = new_cfg_block(lc);
+    emit_branch(lc, header_b);
+
+    lc->cur_block = header_b;
+    lc->block_terminated = false;
+    MLIR_ValueHandle iv = emit_memref_load_scalar(lc, slot);
+    MLIR_ValueHandle endv = lower_expr_value(lc, end_op);
+    MLIR_ValueHandle cond = emit_icmp_i32(lc, 3, iv, endv);
+    emit_cond_branch(lc, cond, body_b, exit_b);
+
+    lc->cur_block = body_b;
+    lc->block_terminated = false;
+    if (!lower_stmt_ref(lc, get_op_ref(op, "body"))) {
+        return false;
+    }
+    if (!lc->block_terminated) {
+        emit_branch(lc, step_b);
+    }
+
+    lc->cur_block = step_b;
+    lc->block_terminated = false;
+    iv = emit_memref_load_scalar(lc, slot);
+    MLIR_ValueHandle stepv;
+    if (inc_op != MLIR_INVALID_HANDLE) {
+        stepv = lower_expr_value(lc, inc_op);
+    } else {
+        stepv = emit_const_i32(lc, 1);
+    }
+    MLIR_ValueHandle next = emit_binop_i32(lc, OP_TYPE_ARITH_ADDI,
+        str_lit("arith.addi"), iv, stepv);
+    emit_memref_store_scalar(lc, next, slot);
+    emit_branch(lc, header_b);
+
+    lc->cur_block = exit_b;
+    lc->block_terminated = false;
+    return true;
 }
 bool ASR_LowerIf(ASR_LoweringContext *lc, MLIR_OpHandle op) {
-    return ASR_LowerUnsupported(lc, op, "If lowering pending");
+    MLIR_OpHandle test_op = get_op_ref(op, "test");
+    if (test_op == MLIR_INVALID_HANDLE) {
+        return ASR_LowerUnsupported(lc, op, "If: missing test");
+    }
+    MLIR_ValueHandle cond = lower_expr_i1(lc, test_op);
+    if (cond == MLIR_INVALID_HANDLE) {
+        return false;
+    }
+
+    MLIR_BlockHandle then_b = new_cfg_block(lc);
+    MLIR_BlockHandle else_b = new_cfg_block(lc);
+    MLIR_BlockHandle merge_b = new_cfg_block(lc);
+    emit_cond_branch(lc, cond, then_b, else_b);
+
+    lc->cur_block = then_b;
+    lc->block_terminated = false;
+    if (!lower_stmt_ref(lc, get_op_ref(op, "body"))) {
+        return false;
+    }
+    if (!lc->block_terminated) {
+        emit_branch(lc, merge_b);
+    }
+
+    lc->cur_block = else_b;
+    lc->block_terminated = false;
+    if (!lower_stmt_ref(lc, get_op_ref(op, "orelse"))) {
+        return false;
+    }
+    if (!lc->block_terminated) {
+        emit_branch(lc, merge_b);
+    }
+
+    lc->cur_block = merge_b;
+    lc->block_terminated = false;
+    return true;
+}
+bool ASR_LowerErrorStop(ASR_LoweringContext *lc, MLIR_OpHandle op) {
+    (void)op;
+    MLIR_ValueHandle code = emit_const_i32(lc, 1);
+    MLIR_ValueHandle ops[1] = {code};
+    append_current(lc, emit_op(lc, OP_TYPE_FUNC_RETURN, str_lit("func.return"),
+        NULL, 0, NULL, 0, NULL, 0, ops, 1));
+    lc->block_terminated = true;
+    return true;
 }
 bool ASR_LowerInteger(ASR_LoweringContext *lc, MLIR_OpHandle op) {
     (void)lc; (void)op; return true;

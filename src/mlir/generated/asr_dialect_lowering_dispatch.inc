@@ -61,6 +61,8 @@ bool ASR_DialectLowerOneOp(ASR_LoweringContext *ctx, MLIR_OpHandle op) {
         return ASR_LowerAssignment(ctx, op);
     case ASR_DIALECT_OP_STMT_DOLOOP:
         return ASR_LowerDoLoop(ctx, op);
+    case ASR_DIALECT_OP_STMT_ERRORSTOP:
+        return ASR_LowerErrorStop(ctx, op);
     case ASR_DIALECT_OP_STMT_IF:
         return ASR_LowerIf(ctx, op);
     case ASR_DIALECT_OP_STMT_INTRINSICIMPURESUBROUTINE:

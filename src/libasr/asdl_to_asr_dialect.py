@@ -55,7 +55,7 @@ LOWERED_OPS = {
     "IntrinsicImpureSubroutine",
     # Scaffolding
     "TranslationUnit", "Program", "Function", "Variable", "Assignment",
-    "Return", "Print", "DoLoop", "If", "Allocate",
+    "Return", "Print", "DoLoop", "If", "ErrorStop", "Allocate",
     # Types
     "Integer", "Real", "Logical", "Complex", "Array",
 }
@@ -165,6 +165,14 @@ def collect_ops(mod: asdl.Module) -> list[dict]:
                         "kind": enum_kind(cat, cons.name),
                         "mlir_name": mlir_op_name(cons.name),
                     })
+            elif isinstance(val, asdl.Product):
+                ops.append({
+                    "category": cat,
+                    "name": cat,
+                    "fields": val.fields,
+                    "kind": enum_kind(cat, cat),
+                    "mlir_name": mlir_op_name(cat),
+                })
         elif isinstance(val, asdl.Sum) and is_simple_sum(val):
             pass  # enum, not op
         elif isinstance(val, asdl.Product):
