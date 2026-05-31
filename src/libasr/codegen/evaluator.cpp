@@ -207,6 +207,10 @@ std::string MLIRModule::mlir_high_dialect_dump() const {
     return "";
 }
 
+std::string MLIRModule::mlir_asr_dialect_dump() const {
+    return mlir_asr_dialect_text;
+}
+
 std::string MLIRModule::mlir_llvm_dialect_dump() const {
     if (!mlir_llvm_dialect_text.empty()) {
         return mlir_llvm_dialect_text;

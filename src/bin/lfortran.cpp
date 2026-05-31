@@ -1075,7 +1075,8 @@ int save_mod_files(const LCompilers::ASR::TranslationUnit_t &u,
 int handle_mlir(const std::string &infile,
         const std::string &outfile,
         CompilerOptions &compiler_options,
-        bool show_mlir_high_dialect, bool show_mlir_llvm_dialect,
+        bool show_mlir_asr_dialect, bool show_mlir_high_dialect,
+        bool show_mlir_llvm_dialect,
         bool emit_mlir, bool emit_llvm,
         bool use_mlir_new) {
     std::string input = read_file_ok(infile);
@@ -1108,7 +1109,9 @@ int handle_mlir(const std::string &infile,
     diagnostics.diagnostics.clear();
     LCompilers::Result<std::unique_ptr<LCompilers::MLIRModule>> res =
         use_mlir_new
-            ? fe.get_mlir_new(*(LCompilers::ASR::asr_t *)asr, diagnostics)
+            ? (show_mlir_asr_dialect
+                ? fe.get_mlir_new_asr_dialect(*(LCompilers::ASR::asr_t *)asr, diagnostics)
+                : fe.get_mlir_new(*(LCompilers::ASR::asr_t *)asr, diagnostics))
             : fe.get_mlir(*(LCompilers::ASR::asr_t *)asr, diagnostics);
     std::cerr << diagnostics.render(lm, compiler_options);
     if (res.ok) {
@@ -1117,7 +1120,9 @@ int handle_mlir(const std::string &infile,
         LCOMPILERS_ASSERT(diagnostics.has_error())
         return 2;
     }
-    if (show_mlir_high_dialect) {
+    if (show_mlir_asr_dialect) {
+        std::cout << m->mlir_asr_dialect_dump();
+    } else if (show_mlir_high_dialect) {
         std::cout << m->mlir_high_dialect_dump();
     } else if (show_mlir_llvm_dialect) {
         std::cout << m->mlir_llvm_dialect_dump();
@@ -2803,13 +2808,15 @@ int main_app(int argc, char *argv[]) {
         return 1;
 #endif
     }
-    if (opts.show_mlir || opts.show_mlir_high_dialect || opts.show_mlir_llvm_dialect
-            || opts.show_llvm_from_mlir) {
+    if (opts.show_mlir || opts.show_mlir_asr_dialect || opts.show_mlir_high_dialect
+            || opts.show_mlir_llvm_dialect || opts.show_llvm_from_mlir) {
 #ifdef HAVE_LFORTRAN_MLIR
         bool use_mlir_new = (opts.arg_backend == "mlir-new")
-            || opts.show_mlir_high_dialect || opts.show_mlir_llvm_dialect;
+            || opts.show_mlir_asr_dialect || opts.show_mlir_high_dialect
+            || opts.show_mlir_llvm_dialect;
         return handle_mlir(opts.arg_file, outfile, compiler_options,
-            opts.show_mlir_high_dialect, opts.show_mlir_llvm_dialect,
+            opts.show_mlir_asr_dialect, opts.show_mlir_high_dialect,
+            opts.show_mlir_llvm_dialect,
             opts.show_mlir, opts.show_llvm_from_mlir,
             use_mlir_new);
 #else
@@ -2889,7 +2896,7 @@ int main_app(int argc, char *argv[]) {
         } else if (backend == Backend::mlir) {
 #ifdef HAVE_LFORTRAN_MLIR
             result = handle_mlir(opts.arg_file, outfile, compiler_options,
-                false, false, false, false, false);
+                false, false, false, false, false, false);
 #else
             std::cerr << "The -c option with `--backend=mlir` requires the "
                 "MLIR backend to be enabled. Recompile with `WITH_MLIR=yes`."
@@ -2899,7 +2906,7 @@ int main_app(int argc, char *argv[]) {
         } else if (backend == Backend::mlir_new) {
 #ifdef HAVE_LFORTRAN_MLIR
             result = handle_mlir(opts.arg_file, outfile, compiler_options,
-                false, false, false, false, true);
+                false, false, false, false, false, true);
 #else
             std::cerr << "The -c option with `--backend=mlir-new` requires the "
                 "MLIR backend to be enabled. Recompile with `WITH_MLIR=yes`."
@@ -2960,7 +2967,7 @@ int main_app(int argc, char *argv[]) {
             } else if (backend == Backend::mlir) {
 #ifdef HAVE_LFORTRAN_MLIR
                 err = handle_mlir(arg_file, tmp_o, compiler_options,
-                    false, false, false, false, false);
+                    false, false, false, false, false, false);
 #else
                 std::cerr << "Compiling Fortran files to object files using "
                     "`--backend=mlir` requires the MLIR backend to be enabled. "
@@ -2970,7 +2977,7 @@ int main_app(int argc, char *argv[]) {
             } else if (backend == Backend::mlir_new) {
 #ifdef HAVE_LFORTRAN_MLIR
                 err = handle_mlir(arg_file, tmp_o, compiler_options,
-                    false, false, false, false, true);
+                    false, false, false, false, false, true);
 #else
                 std::cerr << "Compiling Fortran files to object files using "
                     "`--backend=mlir-new` requires the MLIR backend to be enabled. "
