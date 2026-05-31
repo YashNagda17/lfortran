@@ -426,6 +426,46 @@ public:
         append_module(last_value);
     }
 
+    void append_seq_n_args_attr(MLIR_OpHandle op, size_t n) {
+        MLIR_TypeHandle i64_ty = MLIR_CreateTypeInteger(&ctx, 64, false);
+        MLIR_AttributeHandle n_attr = MLIR_CreateAttributeInteger(
+            &ctx, str_lit("asr.f.n_args"), (int64_t)n, i64_ty);
+        MLIR_AppendOpAttribute(&ctx, op, n_attr);
+    }
+
+    void visit_ArrayConstructor(const ASR::ArrayConstructor_t &x) {
+        size_t n_args = x.n_args;
+        MLIR_OpHandle *args = emit_expr_op_array(x.m_args, n_args);
+        MLIR_TypeHandle type = convert_type(*x.m_type);
+        MLIR_ValueHandle value = MLIR_INVALID_HANDLE;
+        if (x.m_value) {
+            value = emit_expr(*x.m_value);
+        }
+        int64_t storage_format = (int64_t)x.m_storage_format;
+        MLIR_ValueHandle struct_var = MLIR_INVALID_HANDLE;
+        if (x.m_struct_var) {
+            struct_var = emit_expr(*x.m_struct_var);
+        }
+        last_value = ASR_CreateArrayConstructorOp(&ctx, default_loc(), args, n_args,
+            type, value, storage_format, struct_var);
+        append_seq_n_args_attr(last_value, n_args);
+    }
+
+    void visit_ArrayItem(const ASR::ArrayItem_t &x) {
+        MLIR_ValueHandle v = emit_expr(*x.m_v);
+        size_t n_args = x.n_args;
+        MLIR_OpHandle *args = emit_array_index_op_array(x.m_args, n_args);
+        MLIR_TypeHandle type = convert_type(*x.m_type);
+        int64_t storage_format = (int64_t)x.m_storage_format;
+        MLIR_ValueHandle value = MLIR_INVALID_HANDLE;
+        if (x.m_value) {
+            value = emit_expr(*x.m_value);
+        }
+        last_value = ASR_CreateArrayItemOp(&ctx, default_loc(), v, args, n_args,
+            type, storage_format, value);
+        append_seq_n_args_attr(last_value, n_args);
+    }
+
 #include <libasr/codegen/generated/asr_to_asr_dialect_visitor.inc>
 
     MLIR_OpHandle program_op = MLIR_INVALID_HANDLE;

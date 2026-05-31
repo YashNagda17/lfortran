@@ -31,19 +31,6 @@
         last_value = ASR_CreateArrayConstantOp(&ctx, op_loc, n_data, data, type, storage_format);
     }
 
-    void visit_ArrayConstructor(const ASR::ArrayConstructor_t &x) {
-        size_t n_args = x.n_args;
-        MLIR_OpHandle *args = emit_expr_op_array(x.m_args, n_args);
-        MLIR_TypeHandle type = convert_type(*x.m_type);
-        MLIR_ValueHandle value = MLIR_INVALID_HANDLE;
-        if (x.m_value) { value = emit_expr(*x.m_value); }
-        int64_t storage_format = (int64_t)x.m_storage_format;
-        MLIR_ValueHandle struct_var = MLIR_INVALID_HANDLE;
-        if (x.m_struct_var) { struct_var = emit_expr(*x.m_struct_var); }
-        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
-        last_value = ASR_CreateArrayConstructorOp(&ctx, op_loc, args, n_args, type, value, storage_format, struct_var);
-    }
-
     void visit_ArrayIsContiguous(const ASR::ArrayIsContiguous_t &x) {
         MLIR_ValueHandle array = emit_expr(*x.m_array);
         MLIR_TypeHandle type = convert_type(*x.m_type);
@@ -51,18 +38,6 @@
         if (x.m_value) { value = emit_expr(*x.m_value); }
         MLIR_LocationHandle op_loc = loc(x.base.base.loc);
         last_value = ASR_CreateArrayIsContiguousOp(&ctx, op_loc, array, type, value);
-    }
-
-    void visit_ArrayItem(const ASR::ArrayItem_t &x) {
-        MLIR_ValueHandle v = emit_expr(*x.m_v);
-        size_t n_args = x.n_args;
-        MLIR_OpHandle *args = emit_array_index_op_array(x.m_args, n_args);
-        MLIR_TypeHandle type = convert_type(*x.m_type);
-        int64_t storage_format = (int64_t)x.m_storage_format;
-        MLIR_ValueHandle value = MLIR_INVALID_HANDLE;
-        if (x.m_value) { value = emit_expr(*x.m_value); }
-        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
-        last_value = ASR_CreateArrayItemOp(&ctx, op_loc, v, args, n_args, type, storage_format, value);
     }
 
     void visit_ArrayPack(const ASR::ArrayPack_t &x) {

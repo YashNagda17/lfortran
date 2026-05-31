@@ -491,7 +491,7 @@ def cpp_emit_field(field: asdl.Field) -> str:
 # Hand-written in asr_to_asr_dialect.cpp (module layout + multi-stmt do bodies).
 SKIP_VISITOR_OPS = {
     "Program", "TranslationUnit", "DoLoop", "Print", "FileWrite", "Variable",
-    "StringFormat",
+    "StringFormat", "ArrayConstructor", "ArrayItem",
 }
 
 # Embedded ASR products emitted by helpers in asr_to_asr_dialect.cpp.
