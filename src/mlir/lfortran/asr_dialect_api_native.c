@@ -118,20 +118,55 @@ ASR_DialectOpKind ASR_DialectGetOpKindNative(MLIR_OpHandle op) {
     return (ASR_DialectOpKind)MLIR_GetAttributeInteger(kind_attr);
 }
 
-static bool verify_one_op(MLIR_Context *ctx, MLIR_OpHandle op) {
+static bool field_holds_op_ref(ASR_DialectFieldKind fk) {
+    switch (fk) {
+        case ASR_FIELD_EXPR:
+        case ASR_FIELD_STMT:
+        case ASR_FIELD_OP:
+        case ASR_FIELD_EXPR_OPT:
+        case ASR_FIELD_STMT_OPT:
+        case ASR_FIELD_SYMBOL_OPT:
+        case ASR_FIELD_NODE_OPT:
+            return true;
+        default:
+            return false;
+    }
+}
+
+static bool verify_op_tree(MLIR_Context *ctx, MLIR_OpHandle op, int depth) {
+    if (op == MLIR_INVALID_HANDLE || depth > 64) {
+        return true;
+    }
     ASR_DialectOpKind kind = ASR_DialectGetOpKindNative(op);
     const ASR_DialectOpSchema *schema = ASR_DialectLookupSchema(kind);
     if (!schema) {
         return false;
     }
     for (size_t i = 0; i < schema->n_fields; ++i) {
-        if (schema->fields[i].presence == ASR_FIELD_REQUIRED) {
+        const ASR_DialectFieldDesc *fd = &schema->fields[i];
+        if (fd->presence == ASR_FIELD_REQUIRED) {
             char buf[128];
-            snprintf(buf, sizeof(buf), "%s%s", ASR_FIELD_PREFIX, schema->fields[i].name);
+            snprintf(buf, sizeof(buf), "%s%s", ASR_FIELD_PREFIX, fd->name);
             if (MLIR_GetOpAttributeByName(op, buf) == MLIR_INVALID_HANDLE) {
                 (void)ctx;
                 return false;
             }
+        }
+    }
+    for (size_t i = 0; i < schema->n_fields; ++i) {
+        const ASR_DialectFieldDesc *fd = &schema->fields[i];
+        if (!field_holds_op_ref(fd->kind)) {
+            continue;
+        }
+        char buf[128];
+        snprintf(buf, sizeof(buf), "%s%s", ASR_FIELD_PREFIX, fd->name);
+        MLIR_AttributeHandle attr = MLIR_GetOpAttributeByName(op, buf);
+        if (attr == MLIR_INVALID_HANDLE) {
+            continue;
+        }
+        MLIR_OpHandle child = (MLIR_OpHandle)MLIR_GetAttributeInteger(attr);
+        if (!verify_op_tree(ctx, child, depth + 1)) {
+            return false;
         }
     }
     return true;
@@ -150,7 +185,7 @@ bool ASR_DialectVerifyNative(MLIR_Context *ctx, MLIR_OpHandle module) {
         if (kind == ASR_DIALECT_OP_INVALID) {
             continue;
         }
-        if (!verify_one_op(ctx, op)) {
+        if (!verify_op_tree(ctx, op, 0)) {
             return false;
         }
     }

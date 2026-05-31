@@ -85,6 +85,14 @@ static ASR_DialectField op_field(const char *name, MLIR_OpHandle op) {
     return f;
 }
 
+static ASR_DialectField product_op_field(const char *name, MLIR_OpHandle op) {
+    ASR_DialectField f{};
+    f.kind = ASR_FIELD_OP;
+    f.name = name;
+    f.value.op = op;
+    return f;
+}
+
 static ASR_DialectField op_opt_field(const char *name, MLIR_OpHandle op) {
     ASR_DialectField f{};
     f.kind = ASR_FIELD_EXPR_OPT;
@@ -93,9 +101,49 @@ static ASR_DialectField op_opt_field(const char *name, MLIR_OpHandle op) {
     return f;
 }
 
+static ASR_DialectField sym_opt_field(const char *name, MLIR_OpHandle op) {
+    ASR_DialectField f{};
+    f.kind = ASR_FIELD_SYMBOL_OPT;
+    f.name = name;
+    f.value.op = op;
+    return f;
+}
+
+static ASR_DialectField id_seq_field(const char *name) {
+    ASR_DialectField f{};
+    f.kind = ASR_FIELD_IDENTIFIER_SEQ;
+    f.name = name;
+    f.value.i64 = 0;
+    return f;
+}
+
+static ASR_DialectField op_seq_field(const char *name) {
+    ASR_DialectField f{};
+    f.kind = ASR_FIELD_OP_SEQ;
+    f.name = name;
+    f.value.op = MLIR_INVALID_HANDLE;
+    return f;
+}
+
+static ASR_DialectField str_opt_field(const char *name, string v) {
+    ASR_DialectField f{};
+    f.kind = ASR_FIELD_STRING_OPT;
+    f.name = name;
+    f.value.str = v;
+    return f;
+}
+
 static ASR_DialectField stmt_seq_field(const char *name, MLIR_OpHandle op) {
     ASR_DialectField f{};
     f.kind = ASR_FIELD_STMT_SEQ;
+    f.name = name;
+    f.value.op = op;
+    return f;
+}
+
+static ASR_DialectField node_seq_field(const char *name, MLIR_OpHandle op) {
+    ASR_DialectField f{};
+    f.kind = ASR_FIELD_NODE_SEQ;
     f.name = name;
     f.value.op = op;
     return f;
@@ -243,6 +291,46 @@ public:
         append_module(emit_print_op(*x.m_text));
     }
 
+    MLIR_OpHandle emit_variable_op(const ASR::Variable_t &v) {
+        MLIR_OpHandle symbolic_value = MLIR_INVALID_HANDLE;
+        MLIR_OpHandle value = MLIR_INVALID_HANDLE;
+        MLIR_OpHandle type_decl = MLIR_INVALID_HANDLE;
+        if (v.m_symbolic_value) {
+            symbolic_value = emit_expr_op(*v.m_symbolic_value);
+        }
+        if (v.m_value) {
+            value = emit_expr_op(*v.m_value);
+        }
+        if (v.m_type_declaration) {
+            type_decl = MLIR_INVALID_HANDLE;
+        }
+        ASR_DialectField fields[21] = {
+            product_op_field("parent_symtab", MLIR_INVALID_HANDLE),
+            str_field("name", asr_cstr(v.m_name)),
+            id_seq_field("dependencies"),
+            i64_field("intent", (int64_t)v.m_intent),
+            op_opt_field("symbolic_value", symbolic_value),
+            op_opt_field("value", value),
+            i64_field("storage", (int64_t)v.m_storage),
+            type_field("type", convert_type(*v.m_type)),
+            sym_opt_field("type_declaration", type_decl),
+            i64_field("abi", (int64_t)v.m_abi),
+            i64_field("access", (int64_t)v.m_access),
+            i64_field("presence", (int64_t)v.m_presence),
+            bool_field("value_attr", v.m_value_attr),
+            bool_field("target_attr", v.m_target_attr),
+            bool_field("contiguous_attr", v.m_contiguous_attr),
+            str_opt_field("bindc_name", asr_cstr(v.m_bindc_name)),
+            bool_field("is_volatile", v.m_is_volatile),
+            bool_field("is_protected", v.m_is_protected),
+            i64_field("pass_attr", (int64_t)v.m_pass_attr),
+            id_opt_field("self_argument", asr_cstr(v.m_self_argument)),
+            op_seq_field("codims"),
+        };
+        return create_op(ASR_DIALECT_OP_SYMBOL_VARIABLE,
+            default_loc(), fields, 21);
+    }
+
     MLIR_OpHandle emit_do_loop_head(const ASR::do_loop_head_t &h) {
         MLIR_OpHandle v = MLIR_INVALID_HANDLE;
         MLIR_OpHandle start = MLIR_INVALID_HANDLE;
@@ -376,23 +464,23 @@ public:
         }
     }
 
-    void visit_Program(const ASR::Program_t &x) {
-        ASR_DialectField prog_fields[1] = {
+    MLIR_OpHandle visit_Program(const ASR::Program_t &x) {
+        ASR_DialectField prog_fields[6] = {
+            product_op_field("symtab", MLIR_INVALID_HANDLE),
             str_field("name", asr_cstr(x.m_name)),
+            id_seq_field("dependencies"),
+            stmt_seq_field("body", MLIR_INVALID_HANDLE),
+            product_op_field("start_name", MLIR_INVALID_HANDLE),
+            product_op_field("end_name", MLIR_INVALID_HANDLE),
         };
-        append_module(create_op(ASR_DIALECT_OP_SYMBOL_PROGRAM,
-            default_loc(), prog_fields, 1));
+        MLIR_OpHandle program_op = create_op(ASR_DIALECT_OP_SYMBOL_PROGRAM,
+            default_loc(), prog_fields, 6);
+        append_module(program_op);
 
         for (auto &item : x.m_symtab->get_scope()) {
             if (ASR::is_a<ASR::Variable_t>(*item.second)) {
-                const ASR::Variable_t &v =
-                    *ASR::down_cast<ASR::Variable_t>(item.second);
-                ASR_DialectField fields[2] = {
-                    str_field("name", asr_cstr(v.m_name)),
-                    type_field("type", convert_type(*v.m_type)),
-                };
-                append_module(create_op(ASR_DIALECT_OP_SYMBOL_VARIABLE,
-                    default_loc(), fields, 2));
+                append_module(emit_variable_op(
+                    *ASR::down_cast<ASR::Variable_t>(item.second)));
             }
         }
         for (size_t i = 0; i < x.n_body; i++) {
@@ -405,19 +493,29 @@ public:
             append_module(create_op(ASR_DIALECT_OP_STMT_RETURN,
                 default_loc(), nullptr, 0));
         }
+        return program_op;
     }
 
     void visit_TranslationUnit(const ASR::TranslationUnit_t &x) {
         emit_module_skeleton();
-        append_module(create_op(ASR_DIALECT_OP_UNIT_TRANSLATIONUNIT,
-            default_loc(), nullptr, 0));
+        MLIR_OpHandle program_op = MLIR_INVALID_HANDLE;
         for (auto &item : x.m_symtab->get_scope()) {
             if (ASR::is_a<ASR::Program_t>(*item.second)) {
-                visit_Program(*ASR::down_cast<ASR::Program_t>(item.second));
-                return;
+                program_op = visit_Program(
+                    *ASR::down_cast<ASR::Program_t>(item.second));
+                break;
             }
         }
-        throw AsrDialectError("asr dialect: no program unit found");
+        if (program_op == MLIR_INVALID_HANDLE) {
+            throw AsrDialectError("asr dialect: no program unit found");
+        }
+        ASR_DialectField tu_fields[2] = {
+            product_op_field("symtab", MLIR_INVALID_HANDLE),
+            node_seq_field("items", program_op),
+        };
+        MLIR_OpHandle tu_op = create_op(ASR_DIALECT_OP_UNIT_TRANSLATIONUNIT,
+            default_loc(), tu_fields, 2);
+        MLIR_InsertBlockOpAtIndex(&ctx, module_block, tu_op, 0);
     }
 };
 
