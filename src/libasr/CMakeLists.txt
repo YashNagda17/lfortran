@@ -160,7 +160,7 @@ if (WITH_MLIR)
     target_link_libraries(asr lfortran_mlir_c_api lfortran_asr_dialect)
     target_include_directories(asr BEFORE PUBLIC
         ${libasr_SOURCE_DIR}/../mlir/lfortran
-        ${libasr_SOURCE_DIR}/../mlir/generated)
+        ${libasr_SOURCE_DIR}/../mlir)
 endif()
 
 # Install the dwarf_convert.py and dat_convert.py

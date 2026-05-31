@@ -115,6 +115,8 @@ target_link_libraries(lfortran_mlir_c_api PUBLIC
 # ASR dialect (Design A): generated from ASR.asdl + native C API
 # ---------------------------------------------------------------------------
 
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+
 set(LF_ASR_ASDL ${CMAKE_CURRENT_SOURCE_DIR}/../libasr/ASR.asdl)
 set(LF_ASR_DIALECT_GEN ${CMAKE_CURRENT_SOURCE_DIR}/../libasr/asdl_to_asr_dialect.py)
 set(LF_ASR_DIALECT_MLIR_GEN ${CMAKE_CURRENT_SOURCE_DIR}/generated)
@@ -158,14 +160,16 @@ target_include_directories(lfortran_asr_dialect BEFORE PUBLIC
     ${LF_MLIR_UPSTREAM}
     ${LF_MLIR_LFORTRAN}/corec
     ${LF_MLIR_UPSTREAM}/corec
-    ${LF_ASR_DIALECT_MLIR_GEN}
+    ${CMAKE_CURRENT_SOURCE_DIR}
 )
 target_include_directories(lfortran_asr_dialect PRIVATE
     ${LLVM_INCLUDE_DIRS}
     ${MLIR_INCLUDE_DIRS}
 )
 if (DEFINED LFORTRAN_CXX_NO_RTTI_FLAG)
-    target_compile_options(lfortran_asr_dialect PRIVATE ${LFORTRAN_CXX_NO_RTTI_FLAG})
+    set_source_files_properties(
+        lfortran/asr_dialect_api_upstream.cpp
+        PROPERTIES COMPILE_FLAGS ${LFORTRAN_CXX_NO_RTTI_FLAG})
 endif()
 target_link_libraries(lfortran_asr_dialect PUBLIC
     lfortran_mlir_c_api

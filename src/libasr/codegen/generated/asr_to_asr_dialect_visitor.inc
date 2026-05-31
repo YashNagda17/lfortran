@@ -195,7 +195,7 @@
     }
 
     void visit_CompilerOptions(const ASR::CompilerOptions_t &x) {
-        string compiler_options_str = str_from_cstr(x.m_compiler_options_str);
+        string compiler_options_str = asr_cstr(x.m_compiler_options_str);
         MLIR_TypeHandle type = convert_type(*x.m_type);
         MLIR_LocationHandle op_loc = loc(x.base.base.loc);
         last_value = ASR_CreateCompilerOptionsOp(&ctx, op_loc, compiler_options_str, type);
@@ -911,7 +911,7 @@
     }
 
     void visit_StringConstant(const ASR::StringConstant_t &x) {
-        string s = str_from_cstr(x.m_s);
+        string s = asr_cstr(x.m_s);
         MLIR_TypeHandle type = convert_type(*x.m_type);
         MLIR_LocationHandle op_loc = loc(x.base.base.loc);
         last_value = ASR_CreateStringConstantOp(&ctx, op_loc, s, type);
@@ -1219,7 +1219,7 @@
 
     void visit_Assign(const ASR::Assign_t &x) {
         int64_t label = x.m_label;
-        string variable = str_from_cstr(x.m_variable);
+        string variable = asr_cstr(x.m_variable);
         MLIR_LocationHandle op_loc = loc(x.base.loc);
         last_value = ASR_CreateAssignOp(&ctx, op_loc, label, variable);
         append_current_stmt(last_value);
@@ -1273,7 +1273,7 @@
     }
 
     void visit_Cycle(const ASR::Cycle_t &x) {
-        string stmt_name = str_from_cstr(x.m_stmt_name);
+        string stmt_name = asr_cstr(x.m_stmt_name);
         MLIR_LocationHandle op_loc = loc(x.base.loc);
         last_value = ASR_CreateCycleOp(&ctx, op_loc, stmt_name);
         append_current_stmt(last_value);
@@ -1319,7 +1319,7 @@
     }
 
     void visit_DoLoop(const ASR::DoLoop_t &x) {
-        string name = str_from_cstr(x.m_name);
+        string name = asr_cstr(x.m_name);
         MLIR_ValueHandle head = emit_product_value(*x.m_head);
         MLIR_ValueHandle body = emit_stmt_seq_value(x.m_body, x.n_body);
         MLIR_ValueHandle orelse = emit_stmt_seq_value(x.m_orelse, x.n_orelse);
@@ -1337,7 +1337,7 @@
     }
 
     void visit_Exit(const ASR::Exit_t &x) {
-        string stmt_name = str_from_cstr(x.m_stmt_name);
+        string stmt_name = asr_cstr(x.m_stmt_name);
         MLIR_LocationHandle op_loc = loc(x.base.loc);
         last_value = ASR_CreateExitOp(&ctx, op_loc, stmt_name);
         append_current_stmt(last_value);
@@ -1647,7 +1647,7 @@
 
     void visit_GoTo(const ASR::GoTo_t &x) {
         int64_t target_id = x.m_target_id;
-        string name = str_from_cstr(x.m_name);
+        string name = asr_cstr(x.m_name);
         MLIR_LocationHandle op_loc = loc(x.base.loc);
         last_value = ASR_CreateGoToOp(&ctx, op_loc, target_id, name);
         append_current_stmt(last_value);
@@ -1655,7 +1655,7 @@
 
     void visit_GoToTarget(const ASR::GoToTarget_t &x) {
         int64_t id = x.m_id;
-        string name = str_from_cstr(x.m_name);
+        string name = asr_cstr(x.m_name);
         MLIR_LocationHandle op_loc = loc(x.base.loc);
         last_value = ASR_CreateGoToTargetOp(&ctx, op_loc, id, name);
         append_current_stmt(last_value);
@@ -1678,7 +1678,7 @@
     }
 
     void visit_If(const ASR::If_t &x) {
-        string name = str_from_cstr(x.m_name);
+        string name = asr_cstr(x.m_name);
         MLIR_ValueHandle test = emit_expr(*x.m_test);
         MLIR_ValueHandle body = emit_stmt_seq_value(x.m_body, x.n_body);
         MLIR_ValueHandle orelse = emit_stmt_seq_value(x.m_orelse, x.n_orelse);
@@ -1785,7 +1785,7 @@
     }
 
     void visit_Select(const ASR::Select_t &x) {
-        string name = str_from_cstr(x.m_name);
+        string name = asr_cstr(x.m_name);
         MLIR_ValueHandle test = emit_expr(*x.m_test);
         MLIR_ValueHandle body = emit_product_seq_value(x.m_body, x.n_body);
         MLIR_ValueHandle default = emit_stmt_seq_value(x.m_default, x.n_default);
@@ -1796,7 +1796,7 @@
     }
 
     void visit_SelectRank(const ASR::SelectRank_t &x) {
-        string name = str_from_cstr(x.m_name);
+        string name = asr_cstr(x.m_name);
         MLIR_ValueHandle selector = emit_expr(*x.m_selector);
         MLIR_ValueHandle body = emit_product_seq_value(x.m_body, x.n_body);
         MLIR_ValueHandle default = emit_stmt_seq_value(x.m_default, x.n_default);
@@ -1807,7 +1807,7 @@
 
     void visit_SelectType(const ASR::SelectType_t &x) {
         MLIR_ValueHandle selector = emit_expr(*x.m_selector);
-        string assoc_name = str_from_cstr(x.m_assoc_name);
+        string assoc_name = asr_cstr(x.m_assoc_name);
         MLIR_ValueHandle body = emit_product_seq_value(x.m_body, x.n_body);
         MLIR_ValueHandle default = emit_stmt_seq_value(x.m_default, x.n_default);
         MLIR_LocationHandle op_loc = loc(x.base.loc);
@@ -1881,7 +1881,7 @@
     }
 
     void visit_WhileLoop(const ASR::WhileLoop_t &x) {
-        string name = str_from_cstr(x.m_name);
+        string name = asr_cstr(x.m_name);
         MLIR_ValueHandle test = emit_expr(*x.m_test);
         MLIR_ValueHandle body = emit_stmt_seq_value(x.m_body, x.n_body);
         MLIR_ValueHandle orelse = emit_stmt_seq_value(x.m_orelse, x.n_orelse);
@@ -1892,7 +1892,7 @@
 
     void visit_AssociateBlock(const ASR::AssociateBlock_t &x) {
         MLIR_ValueHandle symtab = emit_product_value(*x.m_symtab);
-        string name = str_from_cstr(x.m_name);
+        string name = asr_cstr(x.m_name);
         MLIR_ValueHandle body = emit_stmt_seq_value(x.m_body, x.n_body);
         MLIR_LocationHandle op_loc = loc(x.base.base.loc);
         last_value = ASR_CreateAssociateBlockOp(&ctx, op_loc, symtab, name, body);
@@ -1900,7 +1900,7 @@
 
     void visit_Block(const ASR::Block_t &x) {
         MLIR_ValueHandle symtab = emit_product_value(*x.m_symtab);
-        string name = str_from_cstr(x.m_name);
+        string name = asr_cstr(x.m_name);
         MLIR_ValueHandle body = emit_stmt_seq_value(x.m_body, x.n_body);
         MLIR_LocationHandle op_loc = loc(x.base.base.loc);
         last_value = ASR_CreateBlockOp(&ctx, op_loc, symtab, name, body);
@@ -1908,7 +1908,7 @@
 
     void visit_CustomOperator(const ASR::CustomOperator_t &x) {
         MLIR_ValueHandle parent_symtab = emit_product_value(*x.m_parent_symtab);
-        string name = str_from_cstr(x.m_name);
+        string name = asr_cstr(x.m_name);
         string procs = emit_symbol_seq_ref(x.m_procs, x.n_procs);
         int64_t access = (int64_t)x.m_access;
         MLIR_LocationHandle op_loc = loc(x.base.base.loc);
@@ -1917,7 +1917,7 @@
 
     void visit_Enum(const ASR::Enum_t &x) {
         MLIR_ValueHandle symtab = emit_product_value(*x.m_symtab);
-        string name = str_from_cstr(x.m_name);
+        string name = asr_cstr(x.m_name);
         string dependencies = emit_identifier_seq(x.m_dependencies, x.n_dependencies);
         string members = emit_identifier_seq(x.m_members, x.n_members);
         int64_t abi = (int64_t)x.m_abi;
@@ -1932,11 +1932,11 @@
 
     void visit_ExternalSymbol(const ASR::ExternalSymbol_t &x) {
         MLIR_ValueHandle parent_symtab = emit_product_value(*x.m_parent_symtab);
-        string name = str_from_cstr(x.m_name);
+        string name = asr_cstr(x.m_name);
         string external = emit_symbol_ref(*x.m_external);
-        string module_name = str_from_cstr(x.m_module_name);
+        string module_name = asr_cstr(x.m_module_name);
         string scope_names = emit_identifier_seq(x.m_scope_names, x.n_scope_names);
-        string original_name = str_from_cstr(x.m_original_name);
+        string original_name = asr_cstr(x.m_original_name);
         int64_t access = (int64_t)x.m_access;
         MLIR_LocationHandle op_loc = loc(x.base.base.loc);
         last_value = ASR_CreateExternalSymbolOp(&ctx, op_loc, parent_symtab, name, external, module_name, scope_names, original_name, access);
@@ -1944,7 +1944,7 @@
 
     void visit_Function(const ASR::Function_t &x) {
         MLIR_ValueHandle symtab = emit_product_value(*x.m_symtab);
-        string name = str_from_cstr(x.m_name);
+        string name = asr_cstr(x.m_name);
         MLIR_TypeHandle function_signature = convert_type(*x.m_function_signature);
         string dependencies = emit_identifier_seq(x.m_dependencies, x.n_dependencies);
         size_t n_args = x.n_args;
@@ -1956,7 +1956,7 @@
         bool deterministic = x.m_deterministic;
         bool side_effect_free = x.m_side_effect_free;
         string module_file = str_lit("");
-        if (x.m_module_file) { module_file = str_from_cstr(x.m_module_file); }
+        if (x.m_module_file) { module_file = asr_cstr(x.m_module_file); }
         MLIR_ValueHandle start_name = emit_product_value(*x.m_start_name);
         MLIR_ValueHandle end_name = emit_product_value(*x.m_end_name);
         MLIR_LocationHandle op_loc = loc(x.base.base.loc);
@@ -1965,7 +1965,7 @@
 
     void visit_GenericProcedure(const ASR::GenericProcedure_t &x) {
         MLIR_ValueHandle parent_symtab = emit_product_value(*x.m_parent_symtab);
-        string name = str_from_cstr(x.m_name);
+        string name = asr_cstr(x.m_name);
         string procs = emit_symbol_seq_ref(x.m_procs, x.n_procs);
         int64_t access = (int64_t)x.m_access;
         MLIR_LocationHandle op_loc = loc(x.base.base.loc);
@@ -1974,7 +1974,7 @@
 
     void visit_GpuKernelFunction(const ASR::GpuKernelFunction_t &x) {
         MLIR_ValueHandle symtab = emit_product_value(*x.m_symtab);
-        string name = str_from_cstr(x.m_name);
+        string name = asr_cstr(x.m_name);
         MLIR_TypeHandle function_signature = convert_type(*x.m_function_signature);
         string dependencies = emit_identifier_seq(x.m_dependencies, x.n_dependencies);
         size_t n_args = x.n_args;
@@ -1989,8 +1989,8 @@
 
     void visit_Module(const ASR::Module_t &x) {
         MLIR_ValueHandle symtab = emit_product_value(*x.m_symtab);
-        string name = str_from_cstr(x.m_name);
-        string parent_module = str_from_cstr(x.m_parent_module);
+        string name = asr_cstr(x.m_name);
+        string parent_module = asr_cstr(x.m_parent_module);
         string dependencies = emit_identifier_seq(x.m_dependencies, x.n_dependencies);
         bool loaded_from_mod = x.m_loaded_from_mod;
         bool intrinsic = x.m_intrinsic;
@@ -2003,7 +2003,7 @@
 
     void visit_Namelist(const ASR::Namelist_t &x) {
         MLIR_ValueHandle parent_symtab = emit_product_value(*x.m_parent_symtab);
-        string group_name = str_from_cstr(x.m_group_name);
+        string group_name = asr_cstr(x.m_group_name);
         string var_list = emit_symbol_seq_ref(x.m_var_list, x.n_var_list);
         MLIR_LocationHandle op_loc = loc(x.base.base.loc);
         last_value = ASR_CreateNamelistOp(&ctx, op_loc, parent_symtab, group_name, var_list);
@@ -2011,7 +2011,7 @@
 
     void visit_Program(const ASR::Program_t &x) {
         MLIR_ValueHandle symtab = emit_product_value(*x.m_symtab);
-        string name = str_from_cstr(x.m_name);
+        string name = asr_cstr(x.m_name);
         string dependencies = emit_identifier_seq(x.m_dependencies, x.n_dependencies);
         MLIR_ValueHandle body = emit_stmt_seq_value(x.m_body, x.n_body);
         MLIR_ValueHandle start_name = emit_product_value(*x.m_start_name);
@@ -2022,7 +2022,7 @@
 
     void visit_Requirement(const ASR::Requirement_t &x) {
         MLIR_ValueHandle symtab = emit_product_value(*x.m_symtab);
-        string name = str_from_cstr(x.m_name);
+        string name = asr_cstr(x.m_name);
         string args = emit_identifier_seq(x.m_args, x.n_args);
         MLIR_ValueHandle requires = emit_product_seq_value(x.m_requires, x.n_requires);
         MLIR_LocationHandle op_loc = loc(x.base.base.loc);
@@ -2031,7 +2031,7 @@
 
     void visit_Struct(const ASR::Struct_t &x) {
         MLIR_ValueHandle symtab = emit_product_value(*x.m_symtab);
-        string name = str_from_cstr(x.m_name);
+        string name = asr_cstr(x.m_name);
         MLIR_TypeHandle struct_signature = convert_type(*x.m_struct_signature);
         string dependencies = emit_identifier_seq(x.m_dependencies, x.n_dependencies);
         string members = emit_identifier_seq(x.m_members, x.n_members);
@@ -2052,9 +2052,9 @@
 
     void visit_StructMethodDeclaration(const ASR::StructMethodDeclaration_t &x) {
         MLIR_ValueHandle parent_symtab = emit_product_value(*x.m_parent_symtab);
-        string name = str_from_cstr(x.m_name);
-        string self_argument = str_from_cstr(x.m_self_argument);
-        string proc_name = str_from_cstr(x.m_proc_name);
+        string name = asr_cstr(x.m_name);
+        string self_argument = asr_cstr(x.m_self_argument);
+        string proc_name = asr_cstr(x.m_proc_name);
         string proc = emit_symbol_ref(*x.m_proc);
         int64_t abi = (int64_t)x.m_abi;
         bool is_deferred = x.m_is_deferred;
@@ -2065,7 +2065,7 @@
 
     void visit_Template(const ASR::Template_t &x) {
         MLIR_ValueHandle symtab = emit_product_value(*x.m_symtab);
-        string name = str_from_cstr(x.m_name);
+        string name = asr_cstr(x.m_name);
         string args = emit_identifier_seq(x.m_args, x.n_args);
         MLIR_ValueHandle requires = emit_product_seq_value(x.m_requires, x.n_requires);
         MLIR_LocationHandle op_loc = loc(x.base.base.loc);
@@ -2074,7 +2074,7 @@
 
     void visit_Union(const ASR::Union_t &x) {
         MLIR_ValueHandle symtab = emit_product_value(*x.m_symtab);
-        string name = str_from_cstr(x.m_name);
+        string name = asr_cstr(x.m_name);
         string dependencies = emit_identifier_seq(x.m_dependencies, x.n_dependencies);
         string members = emit_identifier_seq(x.m_members, x.n_members);
         int64_t abi = (int64_t)x.m_abi;
@@ -2088,7 +2088,7 @@
 
     void visit_Variable(const ASR::Variable_t &x) {
         MLIR_ValueHandle parent_symtab = emit_product_value(*x.m_parent_symtab);
-        string name = str_from_cstr(x.m_name);
+        string name = asr_cstr(x.m_name);
         string dependencies = emit_identifier_seq(x.m_dependencies, x.n_dependencies);
         int64_t intent = (int64_t)x.m_intent;
         MLIR_ValueHandle symbolic_value = MLIR_INVALID_HANDLE;
@@ -2106,11 +2106,11 @@
         bool target_attr = x.m_target_attr;
         bool contiguous_attr = x.m_contiguous_attr;
         string bindc_name = str_lit("");
-        if (x.m_bindc_name) { bindc_name = str_from_cstr(x.m_bindc_name); }
+        if (x.m_bindc_name) { bindc_name = asr_cstr(x.m_bindc_name); }
         bool is_volatile = x.m_is_volatile;
         bool is_protected = x.m_is_protected;
         int64_t pass_attr = (int64_t)x.m_pass_attr;
-        string self_argument = str_from_cstr(x.m_self_argument);
+        string self_argument = asr_cstr(x.m_self_argument);
         MLIR_ValueHandle codims = emit_product_seq_value(x.m_codims, x.n_codims);
         MLIR_LocationHandle op_loc = loc(x.base.base.loc);
         last_value = ASR_CreateVariableOp(&ctx, op_loc, parent_symtab, name, dependencies, intent, symbolic_value, value, storage, type, type_declaration, abi, access, presence, value_attr, target_attr, contiguous_attr, bindc_name, is_volatile, is_protected, pass_attr, self_argument, codims);
@@ -2161,7 +2161,7 @@
         int64_t abi = (int64_t)x.m_abi;
         int64_t deftype = (int64_t)x.m_deftype;
         string bindc_name = str_lit("");
-        if (x.m_bindc_name) { bindc_name = str_from_cstr(x.m_bindc_name); }
+        if (x.m_bindc_name) { bindc_name = asr_cstr(x.m_bindc_name); }
         bool elemental = x.m_elemental;
         bool pure = x.m_pure;
         bool module = x.m_module;
@@ -2240,7 +2240,7 @@
     }
 
     void visit_TypeParameter(const ASR::TypeParameter_t &x) {
-        string param = str_from_cstr(x.m_param);
+        string param = asr_cstr(x.m_param);
         MLIR_LocationHandle op_loc = loc(x.base.base.loc);
         last_value = ASR_CreateTypeParameterOp(&ctx, op_loc, param);
     }

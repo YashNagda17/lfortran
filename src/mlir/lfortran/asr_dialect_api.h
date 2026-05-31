@@ -25,9 +25,6 @@ typedef struct {
 
 #include "generated/asr_dialect_schema.inc"
 
-typedef uint32_t ASR_DialectOpKind;
-typedef uint32_t ASR_DialectFieldKind;
-
 typedef struct {
     ASR_DialectFieldKind kind;
     const char *name;
@@ -70,9 +67,6 @@ bool ASR_LowerUnsupported(
     ASR_LoweringContext *ctx,
     MLIR_OpHandle op,
     const char *message);
-
-#include "generated/asr_dialect_api_generated.h"
-#include "generated/asr_dialect_lowering_dispatch.inc"
 
 #ifdef __cplusplus
 }
