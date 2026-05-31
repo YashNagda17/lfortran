@@ -77,6 +77,13 @@ static MLIR_OpHandle create_simple_op(
 // State shared across the whole lowering pass
 // -----------------------------------------------------------------------------
 
+#define MAX_MEMREF_ALLOCA_MAP 512
+
+typedef struct {
+    MLIR_ValueHandle ptr;
+    int64_t array_len;
+} MemrefAllocaEntry;
+
 typedef struct LowerState {
     MLIR_Context *ctx;
     MLIR_OpHandle module;
@@ -88,6 +95,9 @@ typedef struct LowerState {
 
     // When true, preserve scf.* and skip cf->llvm (wasm pipeline).
     bool keep_scf;
+
+    MemrefAllocaEntry memref_allocas[MAX_MEMREF_ALLOCA_MAP];
+    size_t n_memref_allocas;
 } LowerState;
 
 // declare i32 @printf(ptr, ...)
@@ -142,21 +152,48 @@ static void ensure_fmt_g_nl(LowerState *st) {
 // uses ReplaceAllUsesOfValue without enforcing type equality on operands, so
 // memref SSA can be replaced by !llvm.ptr before memref.load/store rewrite.
 
-static bool str_contains_substr(string s, const char *sub) {
-    size_t n = 0;
-    while (sub[n]) n++;
-    if (s.size < n) return false;
-    for (size_t i = 0; i + n <= s.size; i++) {
-        if (memcmp(s.str + i, sub, n) == 0) return true;
+static void record_memref_alloca(LowerState *st, MLIR_ValueHandle ptr, int64_t n) {
+    if (st->n_memref_allocas >= MAX_MEMREF_ALLOCA_MAP || n <= 0) {
+        return;
     }
-    return false;
+    st->memref_allocas[st->n_memref_allocas].ptr = ptr;
+    st->memref_allocas[st->n_memref_allocas].array_len = n;
+    st->n_memref_allocas++;
 }
 
-static bool is_memref_1xi32_type(string ts) {
-    if (name_eq(ts, "memref<1xi32>")) return true;
-    return ts.size >= 7 && str_contains_substr(ts, "1xi32") &&
-        ts.size >= 7 && ts.str[0] == 'm' && ts.str[1] == 'e' && ts.str[2] == 'm' &&
-        ts.str[3] == 'r' && ts.str[4] == 'e' && ts.str[5] == 'f' && ts.str[6] == '<';
+static int64_t lookup_memref_alloca_len(LowerState *st, MLIR_ValueHandle mem) {
+    for (size_t i = 0; i < st->n_memref_allocas; i++) {
+        if (st->memref_allocas[i].ptr == mem) {
+            return st->memref_allocas[i].array_len;
+        }
+    }
+    return 1;
+}
+
+// Parse static shapes like memref<5xi32> from the native type printer.
+static int64_t memref_type_static_i32_len(MLIR_Context *ctx, MLIR_TypeHandle mty) {
+    string ts = MLIR_GetTypeString(ctx, mty);
+    const char *prefix = "memref<";
+    size_t plen = 7;
+    if (ts.size < plen + 5) {
+        return 0;
+    }
+    if (memcmp(ts.str, prefix, plen) != 0) {
+        return 0;
+    }
+    size_t i = plen;
+    int64_t n = 0;
+    while (i < ts.size && ts.str[i] >= '0' && ts.str[i] <= '9') {
+        n = n * 10 + (int64_t)(ts.str[i] - '0');
+        i++;
+    }
+    if (i + 4 >= ts.size || ts.str[i] != 'x') {
+        return 0;
+    }
+    if (memcmp(ts.str + i + 1, "i32", 3) != 0 || ts.str[i + 4] != '>') {
+        return 0;
+    }
+    return n > 0 ? n : 0;
 }
 
 static bool lower_memref_alloca(LowerState *st, MLIR_OpHandle op,
@@ -164,12 +201,12 @@ static bool lower_memref_alloca(LowerState *st, MLIR_OpHandle op,
     if (MLIR_GetOpNumResults(op) != 1) return false;
     MLIR_ValueHandle old_res = MLIR_GetOpResult(op, 0);
     MLIR_TypeHandle mty = MLIR_GetValueType(old_res);
-    string ts = MLIR_GetTypeString(st->ctx, mty);
-    if (!is_memref_1xi32_type(ts)) return false;
+    int64_t n_elem = memref_type_static_i32_len(st->ctx, mty);
+    if (n_elem <= 0) return false;
 
     MLIR_LocationHandle loc = MLIR_GetOpLocation(op);
     MLIR_TypeHandle i32ty = ty_i32(st->ctx);
-    MLIR_TypeHandle arrty = MLIR_CreateTypeLLVMArray(st->ctx, i32ty, 1);
+    MLIR_TypeHandle arrty = MLIR_CreateTypeLLVMArray(st->ctx, i32ty, (uint64_t)n_elem);
     MLIR_TypeHandle ptrty = MLIR_CreateTypeLLVMPointer(st->ctx);
     MLIR_TypeHandle i64ty = ty_i64(st->ctx);
 
@@ -197,6 +234,7 @@ static bool lower_memref_alloca(LowerState *st, MLIR_OpHandle op,
     MLIR_InsertBlockOpAtIndex(st->ctx, parent, aop, pos + 1);
 
     MLIR_ReplaceAllUsesOfValue(st->ctx, old_res, alloca_res);
+    record_memref_alloca(st, alloca_res, n_elem);
     return true;
 }
 
@@ -206,10 +244,11 @@ static bool lower_memref_load(LowerState *st, MLIR_OpHandle op,
     if (MLIR_GetOpNumResults(op) != 1) return false;
     MLIR_ValueHandle mem = MLIR_GetOpOperand(op, 0);
     MLIR_ValueHandle idx = MLIR_GetOpOperand(op, 1);
-    (void)mem;
+    (void)idx;
     MLIR_LocationHandle loc = MLIR_GetOpLocation(op);
     MLIR_TypeHandle i32ty = ty_i32(st->ctx);
-    MLIR_TypeHandle arrty = MLIR_CreateTypeLLVMArray(st->ctx, i32ty, 1);
+    int64_t n_elem = lookup_memref_alloca_len(st, mem);
+    MLIR_TypeHandle arrty = MLIR_CreateTypeLLVMArray(st->ctx, i32ty, (uint64_t)n_elem);
     MLIR_TypeHandle ptrty = MLIR_CreateTypeLLVMPointer(st->ctx);
 
     MLIR_ValueHandle gep_res = make_result_value(st->ctx, ptrty, loc);
@@ -247,9 +286,12 @@ static bool lower_memref_store(LowerState *st, MLIR_OpHandle op,
     MLIR_ValueHandle val = MLIR_GetOpOperand(op, 0);
     MLIR_ValueHandle mem = MLIR_GetOpOperand(op, 1);
     MLIR_ValueHandle idx = MLIR_GetOpOperand(op, 2);
+    (void)val;
+    (void)idx;
     MLIR_LocationHandle loc = MLIR_GetOpLocation(op);
     MLIR_TypeHandle i32ty = ty_i32(st->ctx);
-    MLIR_TypeHandle arrty = MLIR_CreateTypeLLVMArray(st->ctx, i32ty, 1);
+    int64_t n_elem = lookup_memref_alloca_len(st, mem);
+    MLIR_TypeHandle arrty = MLIR_CreateTypeLLVMArray(st->ctx, i32ty, (uint64_t)n_elem);
     MLIR_TypeHandle ptrty = MLIR_CreateTypeLLVMPointer(st->ctx);
 
     MLIR_ValueHandle gep_res = make_result_value(st->ctx, ptrty, loc);
