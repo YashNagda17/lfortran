@@ -4,6 +4,8 @@
 #include <libasr/diagnostics.h>
 #include <libasr/asr_utils.h>
 
+#include <cstdint>
+
 #include <cstdio>
 #include <cstring>
 #include <map>
@@ -72,6 +74,17 @@ public:
     }
 
     MLIR_TypeHandle convert_type(const ASR::ttype_t &t) {
+        if (ASR::is_a<ASR::Array_t>(t)) {
+            int64_t len = ASRUtils::get_fixed_size_of_array(
+                const_cast<ASR::ttype_t *>(&t));
+            if (len <= 0) {
+                len = 1;
+            }
+            int64_t shape[1] = {len};
+            ASR::ttype_t *elem = ASRUtils::type_get_past_array(
+                const_cast<ASR::ttype_t *>(&t));
+            return MLIR_CreateTypeMemref(&ctx, shape, 1, convert_type(*elem));
+        }
         if (ASR::is_a<ASR::Integer_t>(t)) {
             const ASR::Integer_t &it = *ASR::down_cast<ASR::Integer_t>(&t);
             return MLIR_CreateTypeInteger(&ctx, (uint32_t)it.m_kind, true);
@@ -84,6 +97,49 @@ public:
             return MLIR_CreateTypeFloat(&ctx, (uint32_t)rt.m_kind, false);
         }
         return MLIR_CreateTypeInteger(&ctx, 32, true);
+    }
+
+    MLIR_OpHandle *emit_expr_op_array(ASR::expr_t **exprs, size_t n) {
+        if (n == 0) {
+            return nullptr;
+        }
+        MLIR_OpHandle *buf = (MLIR_OpHandle *)arena_alloc(
+            arena, n * sizeof(MLIR_OpHandle));
+        for (size_t i = 0; i < n; ++i) {
+            buf[i] = emit_expr(*exprs[i]);
+        }
+        return buf;
+    }
+
+    MLIR_OpHandle *emit_stmt_op_array(ASR::stmt_t **stmts, size_t n) {
+        if (n == 0) {
+            return nullptr;
+        }
+        MLIR_OpHandle *buf = (MLIR_OpHandle *)arena_alloc(
+            arena, n * sizeof(MLIR_OpHandle));
+        for (size_t i = 0; i < n; ++i) {
+            buf[i] = emit_stmt(*stmts[i]);
+        }
+        return buf;
+    }
+
+    MLIR_OpHandle *emit_array_index_op_array(const ASR::array_index_t *indices,
+            size_t n) {
+        if (n == 0 || !indices) {
+            return nullptr;
+        }
+        MLIR_OpHandle *buf = (MLIR_OpHandle *)arena_alloc(
+            arena, n * sizeof(MLIR_OpHandle));
+        for (size_t i = 0; i < n; ++i) {
+            buf[i] = emit_array_index(indices[i]);
+        }
+        return buf;
+    }
+
+    MLIR_OpHandle *emit_product_op_array(const void *nodes, size_t n) {
+        (void)nodes;
+        (void)n;
+        return nullptr;
     }
 
     string emit_symbol_ref(const ASR::symbol_t &s) {
@@ -255,6 +311,26 @@ public:
         emit_print_exprs(*x.m_text);
     }
 
+    void visit_StringFormat(const ASR::StringFormat_t &x) {
+        MLIR_ValueHandle fmt = MLIR_INVALID_HANDLE;
+        if (x.m_fmt) {
+            fmt = emit_expr(*x.m_fmt);
+        }
+        MLIR_OpHandle *args = emit_expr_op_array(x.m_args, x.n_args);
+        MLIR_TypeHandle type = convert_type(*x.m_type);
+        MLIR_ValueHandle value = MLIR_INVALID_HANDLE;
+        if (x.m_value) {
+            value = emit_expr(*x.m_value);
+        }
+        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
+        last_value = ASR_CreateStringFormatOp(&ctx, op_loc, fmt, args, x.n_args,
+            (int64_t)x.m_kind, type, value);
+        MLIR_TypeHandle i64_ty = MLIR_CreateTypeInteger(&ctx, 64, false);
+        MLIR_AttributeHandle n_attr = MLIR_CreateAttributeInteger(
+            &ctx, str_lit("asr.f.n_args"), (int64_t)x.n_args, i64_ty);
+        MLIR_AppendOpAttribute(&ctx, last_value, n_attr);
+    }
+
     void visit_FileWrite(const ASR::FileWrite_t &x) {
         bool is_stdout = false;
         if (x.m_unit) {
@@ -298,15 +374,21 @@ public:
         }
         suppress_module_append = false;
         MLIR_ValueHandle head = emit_do_loop_head(x.m_head);
-        MLIR_ValueHandle body = body_ops.empty()
-            ? MLIR_INVALID_HANDLE
-            : body_ops.back();
+        MLIR_OpHandle *body_ptr = nullptr;
+        size_t n_body = body_ops.size();
+        if (n_body > 0) {
+            body_ptr = (MLIR_OpHandle *)arena_alloc(
+                arena, n_body * sizeof(MLIR_OpHandle));
+            for (size_t i = 0; i < n_body; ++i) {
+                body_ptr[i] = body_ops[i];
+            }
+        }
         last_value = ASR_CreateDoLoopOp(&ctx, default_loc(),
-            asr_cstr(x.m_name), head, body, MLIR_INVALID_HANDLE);
+            asr_cstr(x.m_name), head, body_ptr, n_body, nullptr, 0);
         append_current_stmt(last_value);
-        if (!body_ops.empty()) {
+        if (body_ptr) {
             ASR_DialectEmitRegistryAddDoLoopBody(
-                last_value, body_ops.data(), body_ops.size());
+                last_value, body_ptr, n_body);
         }
     }
 
@@ -323,16 +405,24 @@ public:
         if (v.m_type_declaration) {
             type_decl = emit_symbol_ref(*v.m_type_declaration);
         }
+        MLIR_TypeHandle var_ty = convert_type(*v.m_type);
         last_value = ASR_CreateVariableOp(&ctx, default_loc(),
             MLIR_INVALID_HANDLE, asr_cstr(v.m_name), str_lit(""),
             (int64_t)v.m_intent, symbolic_value, value, (int64_t)v.m_storage,
-            convert_type(*v.m_type), type_decl, (int64_t)v.m_abi,
+            var_ty, type_decl, (int64_t)v.m_abi,
             (int64_t)v.m_access, (int64_t)v.m_presence, v.m_value_attr,
             v.m_target_attr, v.m_contiguous_attr,
             v.m_bindc_name ? asr_cstr(v.m_bindc_name) : str_lit(""),
             v.m_is_volatile, v.m_is_protected, (int64_t)v.m_pass_attr,
             v.m_self_argument ? asr_cstr(v.m_self_argument) : str_lit(""),
             nullptr, 0);
+        if (ASR::is_a<ASR::Array_t>(*v.m_type)) {
+            int64_t arr_len = ASRUtils::get_fixed_size_of_array(v.m_type);
+            MLIR_TypeHandle i64_ty = MLIR_CreateTypeInteger(&ctx, 64, false);
+            MLIR_AttributeHandle len_attr = MLIR_CreateAttributeInteger(
+                &ctx, str_lit("asr.f.array_len"), arr_len, i64_ty);
+            MLIR_AppendOpAttribute(&ctx, last_value, len_attr);
+        }
         append_module(last_value);
     }
 
@@ -343,7 +433,7 @@ public:
     void visit_Program(const ASR::Program_t &x) {
         program_op = ASR_CreateProgramOp(&ctx, default_loc(),
             MLIR_INVALID_HANDLE, asr_cstr(x.m_name), str_lit(""),
-            MLIR_INVALID_HANDLE, MLIR_INVALID_HANDLE, MLIR_INVALID_HANDLE);
+            nullptr, 0, MLIR_INVALID_HANDLE, MLIR_INVALID_HANDLE);
         last_value = program_op;
         append_module(program_op);
 
@@ -378,8 +468,9 @@ public:
         if (program_op == MLIR_INVALID_HANDLE) {
             throw AsrDialectError("asr dialect: no program unit found");
         }
+        MLIR_OpHandle items[1] = {program_op};
         last_value = ASR_CreateTranslationUnitOp(&ctx, default_loc(),
-            MLIR_INVALID_HANDLE, program_op);
+            MLIR_INVALID_HANDLE, items, 1);
         MLIR_InsertBlockOpAtIndex(&ctx, module_block, last_value, 0);
     }
 };
