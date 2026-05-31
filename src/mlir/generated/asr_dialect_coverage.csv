@@ -72,7 +72,7 @@ expr,ListItem,ASR_DIALECT_OP_EXPR_LISTITEM,asr.list_item,yes,yes,unsupported,no
 expr,ListLen,ASR_DIALECT_OP_EXPR_LISTLEN,asr.list_len,yes,yes,unsupported,no
 expr,ListRepeat,ASR_DIALECT_OP_EXPR_LISTREPEAT,asr.list_repeat,yes,yes,unsupported,no
 expr,ListSection,ASR_DIALECT_OP_EXPR_LISTSECTION,asr.list_section,yes,yes,unsupported,no
-expr,LogicalBinOp,ASR_DIALECT_OP_EXPR_LOGICALBINOP,asr.logical_bin_op,yes,yes,unsupported,no
+expr,LogicalBinOp,ASR_DIALECT_OP_EXPR_LOGICALBINOP,asr.logical_bin_op,yes,yes,implemented,focus
 expr,LogicalCompare,ASR_DIALECT_OP_EXPR_LOGICALCOMPARE,asr.logical_compare,yes,yes,implemented,focus
 expr,LogicalConstant,ASR_DIALECT_OP_EXPR_LOGICALCONSTANT,asr.logical_constant,yes,yes,implemented,focus
 expr,LogicalNot,ASR_DIALECT_OP_EXPR_LOGICALNOT,asr.logical_not,yes,yes,implemented,focus
@@ -101,7 +101,7 @@ expr,StringCompare,ASR_DIALECT_OP_EXPR_STRINGCOMPARE,asr.string_compare,yes,yes,
 expr,StringConcat,ASR_DIALECT_OP_EXPR_STRINGCONCAT,asr.string_concat,yes,yes,unsupported,no
 expr,StringConstant,ASR_DIALECT_OP_EXPR_STRINGCONSTANT,asr.string_constant,yes,yes,unsupported,no
 expr,StringContains,ASR_DIALECT_OP_EXPR_STRINGCONTAINS,asr.string_contains,yes,yes,unsupported,no
-expr,StringFormat,ASR_DIALECT_OP_EXPR_STRINGFORMAT,asr.string_format,yes,yes,unsupported,no
+expr,StringFormat,ASR_DIALECT_OP_EXPR_STRINGFORMAT,asr.string_format,yes,yes,implemented,focus
 expr,StringItem,ASR_DIALECT_OP_EXPR_STRINGITEM,asr.string_item,yes,yes,unsupported,no
 expr,StringLen,ASR_DIALECT_OP_EXPR_STRINGLEN,asr.string_len,yes,yes,unsupported,no
 expr,StringOrd,ASR_DIALECT_OP_EXPR_STRINGORD,asr.string_ord,yes,yes,unsupported,no
@@ -170,7 +170,7 @@ stmt,FileInquire,ASR_DIALECT_OP_STMT_FILEINQUIRE,asr.file_inquire,yes,yes,unsupp
 stmt,FileOpen,ASR_DIALECT_OP_STMT_FILEOPEN,asr.file_open,yes,yes,unsupported,no
 stmt,FileRead,ASR_DIALECT_OP_STMT_FILEREAD,asr.file_read,yes,yes,unsupported,no
 stmt,FileRewind,ASR_DIALECT_OP_STMT_FILEREWIND,asr.file_rewind,yes,yes,unsupported,no
-stmt,FileWrite,ASR_DIALECT_OP_STMT_FILEWRITE,asr.file_write,yes,yes,unsupported,no
+stmt,FileWrite,ASR_DIALECT_OP_STMT_FILEWRITE,asr.file_write,yes,yes,implemented,focus
 stmt,Flush,ASR_DIALECT_OP_STMT_FLUSH,asr.flush,yes,yes,unsupported,no
 stmt,ForAllSingle,ASR_DIALECT_OP_STMT_FORALLSINGLE,asr.for_all_single,yes,yes,unsupported,no
 stmt,ForEach,ASR_DIALECT_OP_STMT_FOREACH,asr.for_each,yes,yes,unsupported,no

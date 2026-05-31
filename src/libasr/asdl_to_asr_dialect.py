@@ -46,7 +46,8 @@ LOWERED_OPS = {
     # Arithmetic
     "IntegerConstant", "IntegerBinOp", "IntegerCompare", "IntegerUnaryMinus",
     "IntegerBitNot", "RealConstant", "RealBinOp", "RealCompare", "RealUnaryMinus",
-    "Cast", "Var", "LogicalConstant", "LogicalNot", "LogicalCompare",
+    "Cast", "Var", "LogicalConstant", "LogicalNot", "LogicalCompare", "LogicalBinOp",
+    "StringFormat",
     # Array
     "ArrayItem", "ArrayConstant", "ArrayConstructor", "ArraySize", "ArrayBound",
     "ArraySection", "ArrayTranspose", "ArrayReshape", "ArrayPhysicalCast",
@@ -55,7 +56,7 @@ LOWERED_OPS = {
     "IntrinsicImpureSubroutine",
     # Scaffolding
     "TranslationUnit", "Program", "Function", "Variable", "Assignment",
-    "Return", "Print", "DoLoop", "If", "ErrorStop", "Allocate",
+    "Return", "Print", "FileWrite", "DoLoop", "If", "ErrorStop", "Allocate",
     # Types
     "Integer", "Real", "Logical", "Complex", "Array",
 }
@@ -91,6 +92,7 @@ def mlir_op_name(name: str) -> str:
 CPP_KEYWORDS = {
     "inline", "static", "class", "virtual", "public", "private", "protected",
     "template", "operator", "new", "delete", "this", "friend", "register",
+    "default",
 }
 
 
@@ -103,7 +105,10 @@ def c_param_name(name: str) -> str:
 def field_kind(asdl_type: str, seq: bool, opt: bool) -> str:
     if asdl_type in SIMPLE_SUM_NAMES:
         base = "I64"
-    elif asdl_type in ("expr", "stmt", "symbol", "ttype", "node"):
+    elif asdl_type == "symbol":
+        # Store symbol names as identifier strings in asr.f.* attrs.
+        base = "IDENTIFIER"
+    elif asdl_type in ("expr", "stmt", "ttype", "node"):
         base = asdl_type.upper()
     elif asdl_type == "identifier":
         base = "IDENTIFIER"
@@ -135,7 +140,7 @@ def gen_field_assign(i: int, f: asdl.Field, param: str) -> list[str]:
         f"    fields[{i}].kind = {fk};",
         f"    fields[{i}].name = \"{fname}\";",
     ]
-    if f.type in ("identifier", "string"):
+    if f.type in ("identifier", "string", "symbol"):
         lines.append(f"    fields[{i}].value.str = {param};")
     elif f.type == "bool":
         lines.append(f"    fields[{i}].value.b = {param};")
@@ -145,6 +150,9 @@ def gen_field_assign(i: int, f: asdl.Field, param: str) -> list[str]:
         lines.append(f"    fields[{i}].value.i64 = {param};")
     elif f.type == "ttype":
         lines.append(f"    fields[{i}].value.type = {param};")
+    elif f.seq and fk in ("ASR_FIELD_OP_SEQ", "ASR_FIELD_NODE_SEQ"):
+        lines.append(
+            f"    fields[{i}].value.op = (MLIR_OpHandle)(uintptr_t){param};")
     else:
         lines.append(f"    fields[{i}].value.op = {param};")
     return lines
@@ -308,8 +316,10 @@ def gen_api_generated_h(ops: list[dict]) -> str:
         params = ["MLIR_Context *ctx", "MLIR_LocationHandle loc"]
         for f in stored:
             fname = c_param_name(f.name or f.type)
-            if f.type in ("expr", "stmt", "symbol", "node"):
+            if f.type in ("expr", "stmt", "node"):
                 params.append(f"MLIR_OpHandle {fname}")
+            elif f.type == "symbol":
+                params.append(f"string {fname}")
             elif f.type == "ttype":
                 params.append(f"MLIR_TypeHandle {fname}")
             elif f.type in ("identifier", "string"):
@@ -391,7 +401,7 @@ def cpp_emit_field(field: asdl.Field) -> str:
     asdl_type = field.type
     if name in SKIP_FIELDS:
         return ""
-    fname = name or asdl_type
+    fname = c_param_name(name or asdl_type)
     member = asr_member(field)
     if asdl_type == "expr":
         if field.seq:
@@ -425,7 +435,8 @@ def cpp_emit_field(field: asdl.Field) -> str:
         return f"        MLIR_TypeHandle {fname} = convert_type(*x.{member});"
     if asdl_type == "identifier":
         if field.seq:
-            return f"        string {fname} = emit_identifier_seq(x.{member}, x.{asr_count_member(field)});"
+            return (f"        string {fname} = emit_identifier_seq("
+                    f"x.{member}, x.{asr_count_member(field)});")
         return f"        string {fname} = asr_cstr(x.{member});"
     if asdl_type == "string":
         if field.opt:
@@ -443,18 +454,55 @@ def cpp_emit_field(field: asdl.Field) -> str:
     if is_enum_field(asdl_type):
         return f"        int64_t {fname} = (int64_t)x.{member};"
     if field.seq:
-        return (f"        MLIR_ValueHandle {fname} = emit_product_seq_value("
-                f"x.{member}, x.{asr_count_member(field)});")
+        count = asr_count_member(field)
+        return (f"        size_t n_{fname} = x.{count};\n"
+                f"        MLIR_ValueHandle {fname} = MLIR_INVALID_HANDLE;\n"
+                f"        (void)x.{member};")
+    emit_fn = PRODUCT_EMIT_CPP.get(asdl_type)
+    if emit_fn:
+        if field.opt:
+            return (f"        MLIR_ValueHandle {fname} = MLIR_INVALID_HANDLE;\n"
+                    f"        if (x.{member}) {{ {fname} = {emit_fn}(*x.{member}); }}")
+        return f"        MLIR_ValueHandle {fname} = {emit_fn}(x.{member});"
     if field.opt:
         return (f"        MLIR_ValueHandle {fname} = MLIR_INVALID_HANDLE;\n"
-                f"        if (x.{member}) {{ {fname} = emit_product_value(*x.{member}); }}")
-    return f"        MLIR_ValueHandle {fname} = emit_product_value(*x.{member});"
+                f"        if (x.{member}) {{ {fname} = emit_product_value(x.{member}); }}")
+    return f"        MLIR_ValueHandle {fname} = emit_product_value(x.{member});"
+
+
+# Hand-written in asr_to_asr_dialect.cpp (module layout + multi-stmt do bodies).
+SKIP_VISITOR_OPS = {
+    "Program", "TranslationUnit", "DoLoop", "Print", "FileWrite", "Variable",
+}
+
+# Embedded ASR products emitted by helpers in asr_to_asr_dialect.cpp.
+PRODUCT_EMIT_CPP = {
+    "do_loop_head": "emit_do_loop_head",
+    "array_index": "emit_array_index",
+}
+
+
+def visitor_create_args(fields: list[asdl.Field]) -> list[str]:
+    """Build ASR_Create*Op argument list matching generated API signatures."""
+    args = []
+    for f in fields:
+        fname = c_param_name(f.name or f.type)
+        fk = field_kind(f.type, f.seq, f.opt)
+        # Product/node sequences use MLIR_OpHandle* + count in generated API.
+        if f.seq and fk in ("ASR_FIELD_OP_SEQ", "ASR_FIELD_NODE_SEQ"):
+            args.append("nullptr")
+            args.append(f"n_{fname}")
+            continue
+        args.append(fname)
+    return args
 
 
 def gen_visitor_inc(ops: list[dict]) -> str:
     lines = ["// Generated by asdl_to_asr_dialect.py — do not edit.", ""]
     for op in ops:
-        if op["category"] not in OP_CATEGORIES:
+        if op["category"] not in ("expr", "stmt"):
+            continue
+        if op["name"] in SKIP_VISITOR_OPS:
             continue
         stored = [f for f in op["fields"] if f.name not in SKIP_FIELDS]
         lines.append(f"    void visit_{op['name']}(const ASR::{op['name']}_t &x) {{")
@@ -462,21 +510,12 @@ def gen_visitor_inc(ops: list[dict]) -> str:
             code = cpp_emit_field(f)
             if code:
                 lines.append(code)
-        if op["category"] in ("expr", "ttype"):
-            lines.append("        MLIR_LocationHandle op_loc = loc(x.base.base.loc);")
-        elif op["category"] == "stmt":
-            lines.append("        MLIR_LocationHandle op_loc = loc(x.base.loc);")
-        elif op["category"] == "symbol":
-            lines.append("        MLIR_LocationHandle op_loc = loc(x.base.base.loc);")
-        else:
-            lines.append("        MLIR_LocationHandle op_loc = default_loc();")
-        args = []
-        for f in stored:
-            fname = f.name or f.type
-            args.append(fname)
+        lines.append("        MLIR_LocationHandle op_loc = loc(x.base.base.loc);")
         fn = f"ASR_Create{op['name']}Op"
+        create_args = visitor_create_args(stored)
         if stored:
-            lines.append(f"        last_value = {fn}(&ctx, op_loc, {', '.join(args)});")
+            lines.append(
+                f"        last_value = {fn}(&ctx, op_loc, {', '.join(create_args)});")
         else:
             lines.append(f"        last_value = {fn}(&ctx, op_loc);")
         if op["category"] == "stmt":

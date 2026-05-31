@@ -55,13 +55,15 @@
 
     void visit_ArrayItem(const ASR::ArrayItem_t &x) {
         MLIR_ValueHandle v = emit_expr(*x.m_v);
-        MLIR_ValueHandle args = emit_product_seq_value(x.m_args, x.n_args);
+        size_t n_args = x.n_args;
+        MLIR_ValueHandle args = MLIR_INVALID_HANDLE;
+        (void)x.m_args;
         MLIR_TypeHandle type = convert_type(*x.m_type);
         int64_t storage_format = (int64_t)x.m_storage_format;
         MLIR_ValueHandle value = MLIR_INVALID_HANDLE;
         if (x.m_value) { value = emit_expr(*x.m_value); }
         MLIR_LocationHandle op_loc = loc(x.base.base.loc);
-        last_value = ASR_CreateArrayItemOp(&ctx, op_loc, v, args, type, storage_format, value);
+        last_value = ASR_CreateArrayItemOp(&ctx, op_loc, v, nullptr, n_args, type, storage_format, value);
     }
 
     void visit_ArrayPack(const ASR::ArrayPack_t &x) {
@@ -79,12 +81,12 @@
     void visit_ArrayPhysicalCast(const ASR::ArrayPhysicalCast_t &x) {
         MLIR_ValueHandle arg = emit_expr(*x.m_arg);
         int64_t old = (int64_t)x.m_old;
-        int64_t new = (int64_t)x.m_new;
+        int64_t new_ = (int64_t)x.m_new;
         MLIR_TypeHandle type = convert_type(*x.m_type);
         MLIR_ValueHandle value = MLIR_INVALID_HANDLE;
         if (x.m_value) { value = emit_expr(*x.m_value); }
         MLIR_LocationHandle op_loc = loc(x.base.base.loc);
-        last_value = ASR_CreateArrayPhysicalCastOp(&ctx, op_loc, arg, old, new, type, value);
+        last_value = ASR_CreateArrayPhysicalCastOp(&ctx, op_loc, arg, old, new_, type, value);
     }
 
     void visit_ArrayRank(const ASR::ArrayRank_t &x) {
@@ -112,12 +114,14 @@
 
     void visit_ArraySection(const ASR::ArraySection_t &x) {
         MLIR_ValueHandle v = emit_expr(*x.m_v);
-        MLIR_ValueHandle args = emit_product_seq_value(x.m_args, x.n_args);
+        size_t n_args = x.n_args;
+        MLIR_ValueHandle args = MLIR_INVALID_HANDLE;
+        (void)x.m_args;
         MLIR_TypeHandle type = convert_type(*x.m_type);
         MLIR_ValueHandle value = MLIR_INVALID_HANDLE;
         if (x.m_value) { value = emit_expr(*x.m_value); }
         MLIR_LocationHandle op_loc = loc(x.base.base.loc);
-        last_value = ASR_CreateArraySectionOp(&ctx, op_loc, v, args, type, value);
+        last_value = ASR_CreateArraySectionOp(&ctx, op_loc, v, nullptr, n_args, type, value);
     }
 
     void visit_ArraySize(const ASR::ArraySize_t &x) {
@@ -186,12 +190,14 @@
 
     void visit_CoarrayRef(const ASR::CoarrayRef_t &x) {
         MLIR_ValueHandle var = emit_expr(*x.m_var);
-        MLIR_ValueHandle coindices = emit_product_seq_value(x.m_coindices, x.n_coindices);
+        size_t n_coindices = x.n_coindices;
+        MLIR_ValueHandle coindices = MLIR_INVALID_HANDLE;
+        (void)x.m_coindices;
         MLIR_TypeHandle type = convert_type(*x.m_type);
         MLIR_ValueHandle value = MLIR_INVALID_HANDLE;
         if (x.m_value) { value = emit_expr(*x.m_value); }
         MLIR_LocationHandle op_loc = loc(x.base.base.loc);
-        last_value = ASR_CreateCoarrayRefOp(&ctx, op_loc, var, coindices, type, value);
+        last_value = ASR_CreateCoarrayRefOp(&ctx, op_loc, var, nullptr, n_coindices, type, value);
     }
 
     void visit_CompilerOptions(const ASR::CompilerOptions_t &x) {
@@ -291,13 +297,13 @@
     void visit_DictItem(const ASR::DictItem_t &x) {
         MLIR_ValueHandle a = emit_expr(*x.m_a);
         MLIR_ValueHandle key = emit_expr(*x.m_key);
-        MLIR_ValueHandle default = MLIR_INVALID_HANDLE;
-        if (x.m_default) { default = emit_expr(*x.m_default); }
+        MLIR_ValueHandle default_ = MLIR_INVALID_HANDLE;
+        if (x.m_default) { default_ = emit_expr(*x.m_default); }
         MLIR_TypeHandle type = convert_type(*x.m_type);
         MLIR_ValueHandle value = MLIR_INVALID_HANDLE;
         if (x.m_value) { value = emit_expr(*x.m_value); }
         MLIR_LocationHandle op_loc = loc(x.base.base.loc);
-        last_value = ASR_CreateDictItemOp(&ctx, op_loc, a, key, default, type, value);
+        last_value = ASR_CreateDictItemOp(&ctx, op_loc, a, key, default_, type, value);
     }
 
     void visit_DictLen(const ASR::DictLen_t &x) {
@@ -364,14 +370,16 @@
         string name = emit_symbol_ref(*x.m_name);
         string original_name = str_lit("");
         if (x.m_original_name) { original_name = emit_symbol_ref(*x.m_original_name); }
-        MLIR_ValueHandle args = emit_product_seq_value(x.m_args, x.n_args);
+        size_t n_args = x.n_args;
+        MLIR_ValueHandle args = MLIR_INVALID_HANDLE;
+        (void)x.m_args;
         MLIR_TypeHandle type = convert_type(*x.m_type);
         MLIR_ValueHandle value = MLIR_INVALID_HANDLE;
         if (x.m_value) { value = emit_expr(*x.m_value); }
         MLIR_ValueHandle dt = MLIR_INVALID_HANDLE;
         if (x.m_dt) { dt = emit_expr(*x.m_dt); }
         MLIR_LocationHandle op_loc = loc(x.base.base.loc);
-        last_value = ASR_CreateFunctionCallOp(&ctx, op_loc, name, original_name, args, type, value, dt);
+        last_value = ASR_CreateFunctionCallOp(&ctx, op_loc, name, original_name, nullptr, n_args, type, value, dt);
     }
 
     void visit_FunctionParam(const ASR::FunctionParam_t &x) {
@@ -639,7 +647,7 @@
 
     void visit_ListSection(const ASR::ListSection_t &x) {
         MLIR_ValueHandle a = emit_expr(*x.m_a);
-        MLIR_ValueHandle section = emit_product_value(*x.m_section);
+        MLIR_ValueHandle section = emit_array_index(x.m_section);
         MLIR_TypeHandle type = convert_type(*x.m_type);
         MLIR_ValueHandle value = MLIR_INVALID_HANDLE;
         if (x.m_value) { value = emit_expr(*x.m_value); }
@@ -971,12 +979,12 @@
     void visit_StringPhysicalCast(const ASR::StringPhysicalCast_t &x) {
         MLIR_ValueHandle arg = emit_expr(*x.m_arg);
         int64_t old = (int64_t)x.m_old;
-        int64_t new = (int64_t)x.m_new;
+        int64_t new_ = (int64_t)x.m_new;
         MLIR_TypeHandle type = convert_type(*x.m_type);
         MLIR_ValueHandle value = MLIR_INVALID_HANDLE;
         if (x.m_value) { value = emit_expr(*x.m_value); }
         MLIR_LocationHandle op_loc = loc(x.base.base.loc);
-        last_value = ASR_CreateStringPhysicalCastOp(&ctx, op_loc, arg, old, new, type, value);
+        last_value = ASR_CreateStringPhysicalCastOp(&ctx, op_loc, arg, old, new_, type, value);
     }
 
     void visit_StringRepeat(const ASR::StringRepeat_t &x) {
@@ -1006,20 +1014,24 @@
 
     void visit_StructConstant(const ASR::StructConstant_t &x) {
         string dt_sym = emit_symbol_ref(*x.m_dt_sym);
-        MLIR_ValueHandle args = emit_product_seq_value(x.m_args, x.n_args);
+        size_t n_args = x.n_args;
+        MLIR_ValueHandle args = MLIR_INVALID_HANDLE;
+        (void)x.m_args;
         MLIR_TypeHandle type = convert_type(*x.m_type);
         MLIR_LocationHandle op_loc = loc(x.base.base.loc);
-        last_value = ASR_CreateStructConstantOp(&ctx, op_loc, dt_sym, args, type);
+        last_value = ASR_CreateStructConstantOp(&ctx, op_loc, dt_sym, nullptr, n_args, type);
     }
 
     void visit_StructConstructor(const ASR::StructConstructor_t &x) {
         string dt_sym = emit_symbol_ref(*x.m_dt_sym);
-        MLIR_ValueHandle args = emit_product_seq_value(x.m_args, x.n_args);
+        size_t n_args = x.n_args;
+        MLIR_ValueHandle args = MLIR_INVALID_HANDLE;
+        (void)x.m_args;
         MLIR_TypeHandle type = convert_type(*x.m_type);
         MLIR_ValueHandle value = MLIR_INVALID_HANDLE;
         if (x.m_value) { value = emit_expr(*x.m_value); }
         MLIR_LocationHandle op_loc = loc(x.base.base.loc);
-        last_value = ASR_CreateStructConstructorOp(&ctx, op_loc, dt_sym, args, type, value);
+        last_value = ASR_CreateStructConstructorOp(&ctx, op_loc, dt_sym, nullptr, n_args, type, value);
     }
 
     void visit_StructInstanceMember(const ASR::StructInstanceMember_t &x) {
@@ -1196,15 +1208,17 @@
     }
 
     void visit_Allocate(const ASR::Allocate_t &x) {
-        MLIR_ValueHandle args = emit_product_seq_value(x.m_args, x.n_args);
+        size_t n_args = x.n_args;
+        MLIR_ValueHandle args = MLIR_INVALID_HANDLE;
+        (void)x.m_args;
         MLIR_ValueHandle stat = MLIR_INVALID_HANDLE;
         if (x.m_stat) { stat = emit_expr(*x.m_stat); }
         MLIR_ValueHandle errmsg = MLIR_INVALID_HANDLE;
         if (x.m_errmsg) { errmsg = emit_expr(*x.m_errmsg); }
         MLIR_ValueHandle source = MLIR_INVALID_HANDLE;
         if (x.m_source) { source = emit_expr(*x.m_source); }
-        MLIR_LocationHandle op_loc = loc(x.base.loc);
-        last_value = ASR_CreateAllocateOp(&ctx, op_loc, args, stat, errmsg, source);
+        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
+        last_value = ASR_CreateAllocateOp(&ctx, op_loc, nullptr, n_args, stat, errmsg, source);
         append_current_stmt(last_value);
     }
 
@@ -1212,7 +1226,7 @@
         MLIR_ValueHandle test = emit_expr(*x.m_test);
         MLIR_ValueHandle msg = MLIR_INVALID_HANDLE;
         if (x.m_msg) { msg = emit_expr(*x.m_msg); }
-        MLIR_LocationHandle op_loc = loc(x.base.loc);
+        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
         last_value = ASR_CreateAssertOp(&ctx, op_loc, test, msg);
         append_current_stmt(last_value);
     }
@@ -1220,7 +1234,7 @@
     void visit_Assign(const ASR::Assign_t &x) {
         int64_t label = x.m_label;
         string variable = asr_cstr(x.m_variable);
-        MLIR_LocationHandle op_loc = loc(x.base.loc);
+        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
         last_value = ASR_CreateAssignOp(&ctx, op_loc, label, variable);
         append_current_stmt(last_value);
     }
@@ -1232,7 +1246,7 @@
         if (x.m_overloaded) { overloaded = emit_stmt(*x.m_overloaded); }
         bool realloc_lhs = x.m_realloc_lhs;
         bool move_allocation = x.m_move_allocation;
-        MLIR_LocationHandle op_loc = loc(x.base.loc);
+        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
         last_value = ASR_CreateAssignmentOp(&ctx, op_loc, target, value, overloaded, realloc_lhs, move_allocation);
         append_current_stmt(last_value);
     }
@@ -1240,14 +1254,14 @@
     void visit_Associate(const ASR::Associate_t &x) {
         MLIR_ValueHandle target = emit_expr(*x.m_target);
         MLIR_ValueHandle value = emit_expr(*x.m_value);
-        MLIR_LocationHandle op_loc = loc(x.base.loc);
+        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
         last_value = ASR_CreateAssociateOp(&ctx, op_loc, target, value);
         append_current_stmt(last_value);
     }
 
     void visit_AssociateBlockCall(const ASR::AssociateBlockCall_t &x) {
         string m = emit_symbol_ref(*x.m_m);
-        MLIR_LocationHandle op_loc = loc(x.base.loc);
+        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
         last_value = ASR_CreateAssociateBlockCallOp(&ctx, op_loc, m);
         append_current_stmt(last_value);
     }
@@ -1255,7 +1269,7 @@
     void visit_BlockCall(const ASR::BlockCall_t &x) {
         int64_t label = x.m_label;
         string m = emit_symbol_ref(*x.m_m);
-        MLIR_LocationHandle op_loc = loc(x.base.loc);
+        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
         last_value = ASR_CreateBlockCallOp(&ctx, op_loc, label, m);
         append_current_stmt(last_value);
     }
@@ -1267,14 +1281,14 @@
         if (x.m_shape) { shape = emit_expr(*x.m_shape); }
         MLIR_ValueHandle lower_bounds = MLIR_INVALID_HANDLE;
         if (x.m_lower_bounds) { lower_bounds = emit_expr(*x.m_lower_bounds); }
-        MLIR_LocationHandle op_loc = loc(x.base.loc);
+        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
         last_value = ASR_CreateCPtrToPointerOp(&ctx, op_loc, cptr, ptr, shape, lower_bounds);
         append_current_stmt(last_value);
     }
 
     void visit_Cycle(const ASR::Cycle_t &x) {
         string stmt_name = asr_cstr(x.m_stmt_name);
-        MLIR_LocationHandle op_loc = loc(x.base.loc);
+        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
         last_value = ASR_CreateCycleOp(&ctx, op_loc, stmt_name);
         append_current_stmt(last_value);
     }
@@ -1284,14 +1298,14 @@
         size_t n_components = x.n_components;
         MLIR_ValueHandle components = emit_expr_seq_value(x.m_components, n_components);
         bool move_allocation = x.m_move_allocation;
-        MLIR_LocationHandle op_loc = loc(x.base.loc);
+        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
         last_value = ASR_CreateDebugCheckArrayBoundsOp(&ctx, op_loc, target, components, move_allocation);
         append_current_stmt(last_value);
     }
 
     void visit_DictClear(const ASR::DictClear_t &x) {
         MLIR_ValueHandle a = emit_expr(*x.m_a);
-        MLIR_LocationHandle op_loc = loc(x.base.loc);
+        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
         last_value = ASR_CreateDictClearOp(&ctx, op_loc, a);
         append_current_stmt(last_value);
     }
@@ -1300,45 +1314,39 @@
         MLIR_ValueHandle a = emit_expr(*x.m_a);
         MLIR_ValueHandle key = emit_expr(*x.m_key);
         MLIR_ValueHandle value = emit_expr(*x.m_value);
-        MLIR_LocationHandle op_loc = loc(x.base.loc);
+        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
         last_value = ASR_CreateDictInsertOp(&ctx, op_loc, a, key, value);
         append_current_stmt(last_value);
     }
 
     void visit_DoConcurrentLoop(const ASR::DoConcurrentLoop_t &x) {
-        MLIR_ValueHandle head = emit_product_seq_value(x.m_head, x.n_head);
+        size_t n_head = x.n_head;
+        MLIR_ValueHandle head = MLIR_INVALID_HANDLE;
+        (void)x.m_head;
         size_t n_shared = x.n_shared;
         MLIR_ValueHandle shared = emit_expr_seq_value(x.m_shared, n_shared);
         size_t n_local = x.n_local;
         MLIR_ValueHandle local = emit_expr_seq_value(x.m_local, n_local);
-        MLIR_ValueHandle reduction = emit_product_seq_value(x.m_reduction, x.n_reduction);
+        size_t n_reduction = x.n_reduction;
+        MLIR_ValueHandle reduction = MLIR_INVALID_HANDLE;
+        (void)x.m_reduction;
         MLIR_ValueHandle body = emit_stmt_seq_value(x.m_body, x.n_body);
-        MLIR_LocationHandle op_loc = loc(x.base.loc);
-        last_value = ASR_CreateDoConcurrentLoopOp(&ctx, op_loc, head, shared, local, reduction, body);
-        append_current_stmt(last_value);
-    }
-
-    void visit_DoLoop(const ASR::DoLoop_t &x) {
-        string name = asr_cstr(x.m_name);
-        MLIR_ValueHandle head = emit_product_value(*x.m_head);
-        MLIR_ValueHandle body = emit_stmt_seq_value(x.m_body, x.n_body);
-        MLIR_ValueHandle orelse = emit_stmt_seq_value(x.m_orelse, x.n_orelse);
-        MLIR_LocationHandle op_loc = loc(x.base.loc);
-        last_value = ASR_CreateDoLoopOp(&ctx, op_loc, name, head, body, orelse);
+        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
+        last_value = ASR_CreateDoConcurrentLoopOp(&ctx, op_loc, nullptr, n_head, shared, local, nullptr, n_reduction, body);
         append_current_stmt(last_value);
     }
 
     void visit_ErrorStop(const ASR::ErrorStop_t &x) {
         MLIR_ValueHandle code = MLIR_INVALID_HANDLE;
         if (x.m_code) { code = emit_expr(*x.m_code); }
-        MLIR_LocationHandle op_loc = loc(x.base.loc);
+        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
         last_value = ASR_CreateErrorStopOp(&ctx, op_loc, code);
         append_current_stmt(last_value);
     }
 
     void visit_Exit(const ASR::Exit_t &x) {
         string stmt_name = asr_cstr(x.m_stmt_name);
-        MLIR_LocationHandle op_loc = loc(x.base.loc);
+        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
         last_value = ASR_CreateExitOp(&ctx, op_loc, stmt_name);
         append_current_stmt(last_value);
     }
@@ -1346,14 +1354,14 @@
     void visit_ExplicitDeallocate(const ASR::ExplicitDeallocate_t &x) {
         size_t n_vars = x.n_vars;
         MLIR_ValueHandle vars = emit_expr_seq_value(x.m_vars, n_vars);
-        MLIR_LocationHandle op_loc = loc(x.base.loc);
+        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
         last_value = ASR_CreateExplicitDeallocateOp(&ctx, op_loc, vars);
         append_current_stmt(last_value);
     }
 
     void visit_Expr(const ASR::Expr_t &x) {
         MLIR_ValueHandle expression = emit_expr(*x.m_expression);
-        MLIR_LocationHandle op_loc = loc(x.base.loc);
+        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
         last_value = ASR_CreateExprOp(&ctx, op_loc, expression);
         append_current_stmt(last_value);
     }
@@ -1366,7 +1374,7 @@
         if (x.m_iostat) { iostat = emit_expr(*x.m_iostat); }
         MLIR_ValueHandle err = MLIR_INVALID_HANDLE;
         if (x.m_err) { err = emit_expr(*x.m_err); }
-        MLIR_LocationHandle op_loc = loc(x.base.loc);
+        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
         last_value = ASR_CreateFileBackspaceOp(&ctx, op_loc, label, unit, iostat, err);
         append_current_stmt(last_value);
     }
@@ -1383,7 +1391,7 @@
         if (x.m_err) { err = emit_expr(*x.m_err); }
         MLIR_ValueHandle status = MLIR_INVALID_HANDLE;
         if (x.m_status) { status = emit_expr(*x.m_status); }
-        MLIR_LocationHandle op_loc = loc(x.base.loc);
+        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
         last_value = ASR_CreateFileCloseOp(&ctx, op_loc, label, unit, iostat, iomsg, err, status);
         append_current_stmt(last_value);
     }
@@ -1396,7 +1404,7 @@
         if (x.m_iostat) { iostat = emit_expr(*x.m_iostat); }
         MLIR_ValueHandle err = MLIR_INVALID_HANDLE;
         if (x.m_err) { err = emit_expr(*x.m_err); }
-        MLIR_LocationHandle op_loc = loc(x.base.loc);
+        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
         last_value = ASR_CreateFileEndfileOp(&ctx, op_loc, label, unit, iostat, err);
         append_current_stmt(last_value);
     }
@@ -1485,7 +1493,7 @@
         if (x.m_pending) { pending = emit_expr(*x.m_pending); }
         MLIR_ValueHandle asynchronous = MLIR_INVALID_HANDLE;
         if (x.m_asynchronous) { asynchronous = emit_expr(*x.m_asynchronous); }
-        MLIR_LocationHandle op_loc = loc(x.base.loc);
+        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
         last_value = ASR_CreateFileInquireOp(&ctx, op_loc, label, unit, file, iostat, err, exist, opened, number, named, name, access, sequential, direct, form, formatted, unformatted, recl, nextrec, blank, position, action, read, write, readwrite, delim, pad, flen, blocksize, convert, carriagecontrol, size, pos, iolength, iolength_vars, decimal, sign, encoding, stream, iomsg, round, pending, asynchronous);
         append_current_stmt(last_value);
     }
@@ -1528,7 +1536,7 @@
         if (x.m_pad) { pad = emit_expr(*x.m_pad); }
         MLIR_ValueHandle asynchronous = MLIR_INVALID_HANDLE;
         if (x.m_asynchronous) { asynchronous = emit_expr(*x.m_asynchronous); }
-        MLIR_LocationHandle op_loc = loc(x.base.loc);
+        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
         last_value = ASR_CreateFileOpenOp(&ctx, op_loc, label, newunit, filename, status, form, access, iostat, iomsg, action, delim, recl, position, blank, encoding, sign, decimal, round, pad, asynchronous);
         append_current_stmt(last_value);
     }
@@ -1562,7 +1570,7 @@
         if (x.m_rec) { rec = emit_expr(*x.m_rec); }
         MLIR_ValueHandle pad = MLIR_INVALID_HANDLE;
         if (x.m_pad) { pad = emit_expr(*x.m_pad); }
-        MLIR_LocationHandle op_loc = loc(x.base.loc);
+        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
         last_value = ASR_CreateFileReadOp(&ctx, op_loc, label, unit, fmt, iomsg, iostat, advance, size, id, pos, values, overloaded, is_formatted, nml, rec, pad);
         append_current_stmt(last_value);
     }
@@ -1577,40 +1585,8 @@
         if (x.m_err) { err = emit_expr(*x.m_err); }
         MLIR_ValueHandle iomsg = MLIR_INVALID_HANDLE;
         if (x.m_iomsg) { iomsg = emit_expr(*x.m_iomsg); }
-        MLIR_LocationHandle op_loc = loc(x.base.loc);
+        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
         last_value = ASR_CreateFileRewindOp(&ctx, op_loc, label, unit, iostat, err, iomsg);
-        append_current_stmt(last_value);
-    }
-
-    void visit_FileWrite(const ASR::FileWrite_t &x) {
-        int64_t label = x.m_label;
-        MLIR_ValueHandle unit = MLIR_INVALID_HANDLE;
-        if (x.m_unit) { unit = emit_expr(*x.m_unit); }
-        MLIR_ValueHandle iomsg = MLIR_INVALID_HANDLE;
-        if (x.m_iomsg) { iomsg = emit_expr(*x.m_iomsg); }
-        MLIR_ValueHandle iostat = MLIR_INVALID_HANDLE;
-        if (x.m_iostat) { iostat = emit_expr(*x.m_iostat); }
-        MLIR_ValueHandle id = MLIR_INVALID_HANDLE;
-        if (x.m_id) { id = emit_expr(*x.m_id); }
-        size_t n_values = x.n_values;
-        MLIR_ValueHandle values = emit_expr_seq_value(x.m_values, n_values);
-        MLIR_ValueHandle separator = MLIR_INVALID_HANDLE;
-        if (x.m_separator) { separator = emit_expr(*x.m_separator); }
-        MLIR_ValueHandle end = MLIR_INVALID_HANDLE;
-        if (x.m_end) { end = emit_expr(*x.m_end); }
-        MLIR_ValueHandle overloaded = MLIR_INVALID_HANDLE;
-        if (x.m_overloaded) { overloaded = emit_stmt(*x.m_overloaded); }
-        bool is_formatted = x.m_is_formatted;
-        string nml = str_lit("");
-        if (x.m_nml) { nml = emit_symbol_ref(*x.m_nml); }
-        MLIR_ValueHandle rec = MLIR_INVALID_HANDLE;
-        if (x.m_rec) { rec = emit_expr(*x.m_rec); }
-        MLIR_ValueHandle pos = MLIR_INVALID_HANDLE;
-        if (x.m_pos) { pos = emit_expr(*x.m_pos); }
-        MLIR_ValueHandle asynchronous = MLIR_INVALID_HANDLE;
-        if (x.m_asynchronous) { asynchronous = emit_expr(*x.m_asynchronous); }
-        MLIR_LocationHandle op_loc = loc(x.base.loc);
-        last_value = ASR_CreateFileWriteOp(&ctx, op_loc, label, unit, iomsg, iostat, id, values, separator, end, overloaded, is_formatted, nml, rec, pos, asynchronous);
         append_current_stmt(last_value);
     }
 
@@ -1623,15 +1599,15 @@
         if (x.m_iomsg) { iomsg = emit_expr(*x.m_iomsg); }
         MLIR_ValueHandle iostat = MLIR_INVALID_HANDLE;
         if (x.m_iostat) { iostat = emit_expr(*x.m_iostat); }
-        MLIR_LocationHandle op_loc = loc(x.base.loc);
+        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
         last_value = ASR_CreateFlushOp(&ctx, op_loc, label, unit, err, iomsg, iostat);
         append_current_stmt(last_value);
     }
 
     void visit_ForAllSingle(const ASR::ForAllSingle_t &x) {
-        MLIR_ValueHandle head = emit_product_value(*x.m_head);
+        MLIR_ValueHandle head = emit_do_loop_head(x.m_head);
         MLIR_ValueHandle assign_stmt = emit_stmt(*x.m_assign_stmt);
-        MLIR_LocationHandle op_loc = loc(x.base.loc);
+        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
         last_value = ASR_CreateForAllSingleOp(&ctx, op_loc, head, assign_stmt);
         append_current_stmt(last_value);
     }
@@ -1640,7 +1616,7 @@
         MLIR_ValueHandle var = emit_expr(*x.m_var);
         MLIR_ValueHandle container = emit_expr(*x.m_container);
         MLIR_ValueHandle body = emit_stmt_seq_value(x.m_body, x.n_body);
-        MLIR_LocationHandle op_loc = loc(x.base.loc);
+        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
         last_value = ASR_CreateForEachOp(&ctx, op_loc, var, container, body);
         append_current_stmt(last_value);
     }
@@ -1648,7 +1624,7 @@
     void visit_GoTo(const ASR::GoTo_t &x) {
         int64_t target_id = x.m_target_id;
         string name = asr_cstr(x.m_name);
-        MLIR_LocationHandle op_loc = loc(x.base.loc);
+        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
         last_value = ASR_CreateGoToOp(&ctx, op_loc, target_id, name);
         append_current_stmt(last_value);
     }
@@ -1656,7 +1632,7 @@
     void visit_GoToTarget(const ASR::GoToTarget_t &x) {
         int64_t id = x.m_id;
         string name = asr_cstr(x.m_name);
-        MLIR_LocationHandle op_loc = loc(x.base.loc);
+        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
         last_value = ASR_CreateGoToTargetOp(&ctx, op_loc, id, name);
         append_current_stmt(last_value);
     }
@@ -1665,14 +1641,16 @@
         string kernel = emit_symbol_ref(*x.m_kernel);
         MLIR_ValueHandle grid_size = emit_expr(*x.m_grid_size);
         MLIR_ValueHandle block_size = emit_expr(*x.m_block_size);
-        MLIR_ValueHandle args = emit_product_seq_value(x.m_args, x.n_args);
-        MLIR_LocationHandle op_loc = loc(x.base.loc);
-        last_value = ASR_CreateGpuKernelLaunchOp(&ctx, op_loc, kernel, grid_size, block_size, args);
+        size_t n_args = x.n_args;
+        MLIR_ValueHandle args = MLIR_INVALID_HANDLE;
+        (void)x.m_args;
+        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
+        last_value = ASR_CreateGpuKernelLaunchOp(&ctx, op_loc, kernel, grid_size, block_size, nullptr, n_args);
         append_current_stmt(last_value);
     }
 
     void visit_GpuSync(const ASR::GpuSync_t &x) {
-        MLIR_LocationHandle op_loc = loc(x.base.loc);
+        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
         last_value = ASR_CreateGpuSyncOp(&ctx, op_loc);
         append_current_stmt(last_value);
     }
@@ -1682,7 +1660,7 @@
         MLIR_ValueHandle test = emit_expr(*x.m_test);
         MLIR_ValueHandle body = emit_stmt_seq_value(x.m_body, x.n_body);
         MLIR_ValueHandle orelse = emit_stmt_seq_value(x.m_orelse, x.n_orelse);
-        MLIR_LocationHandle op_loc = loc(x.base.loc);
+        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
         last_value = ASR_CreateIfOp(&ctx, op_loc, name, test, body, orelse);
         append_current_stmt(last_value);
     }
@@ -1692,7 +1670,7 @@
         int64_t lt_label = x.m_lt_label;
         int64_t eq_label = x.m_eq_label;
         int64_t gt_label = x.m_gt_label;
-        MLIR_LocationHandle op_loc = loc(x.base.loc);
+        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
         last_value = ASR_CreateIfArithmeticOp(&ctx, op_loc, test, lt_label, eq_label, gt_label);
         append_current_stmt(last_value);
     }
@@ -1700,7 +1678,7 @@
     void visit_ImplicitDeallocate(const ASR::ImplicitDeallocate_t &x) {
         size_t n_vars = x.n_vars;
         MLIR_ValueHandle vars = emit_expr_seq_value(x.m_vars, n_vars);
-        MLIR_LocationHandle op_loc = loc(x.base.loc);
+        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
         last_value = ASR_CreateImplicitDeallocateOp(&ctx, op_loc, vars);
         append_current_stmt(last_value);
     }
@@ -1710,7 +1688,7 @@
         size_t n_args = x.n_args;
         MLIR_ValueHandle args = emit_expr_seq_value(x.m_args, n_args);
         int64_t overload_id = x.m_overload_id;
-        MLIR_LocationHandle op_loc = loc(x.base.loc);
+        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
         last_value = ASR_CreateIntrinsicImpureSubroutineOp(&ctx, op_loc, sub_intrinsic_id, args, overload_id);
         append_current_stmt(last_value);
     }
@@ -1718,14 +1696,14 @@
     void visit_ListAppend(const ASR::ListAppend_t &x) {
         MLIR_ValueHandle a = emit_expr(*x.m_a);
         MLIR_ValueHandle ele = emit_expr(*x.m_ele);
-        MLIR_LocationHandle op_loc = loc(x.base.loc);
+        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
         last_value = ASR_CreateListAppendOp(&ctx, op_loc, a, ele);
         append_current_stmt(last_value);
     }
 
     void visit_ListClear(const ASR::ListClear_t &x) {
         MLIR_ValueHandle a = emit_expr(*x.m_a);
-        MLIR_LocationHandle op_loc = loc(x.base.loc);
+        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
         last_value = ASR_CreateListClearOp(&ctx, op_loc, a);
         append_current_stmt(last_value);
     }
@@ -1734,7 +1712,7 @@
         MLIR_ValueHandle a = emit_expr(*x.m_a);
         MLIR_ValueHandle pos = emit_expr(*x.m_pos);
         MLIR_ValueHandle ele = emit_expr(*x.m_ele);
-        MLIR_LocationHandle op_loc = loc(x.base.loc);
+        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
         last_value = ASR_CreateListInsertOp(&ctx, op_loc, a, pos, ele);
         append_current_stmt(last_value);
     }
@@ -1742,7 +1720,7 @@
     void visit_ListRemove(const ASR::ListRemove_t &x) {
         MLIR_ValueHandle a = emit_expr(*x.m_a);
         MLIR_ValueHandle ele = emit_expr(*x.m_ele);
-        MLIR_LocationHandle op_loc = loc(x.base.loc);
+        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
         last_value = ASR_CreateListRemoveOp(&ctx, op_loc, a, ele);
         append_current_stmt(last_value);
     }
@@ -1750,36 +1728,33 @@
     void visit_Nullify(const ASR::Nullify_t &x) {
         size_t n_vars = x.n_vars;
         MLIR_ValueHandle vars = emit_expr_seq_value(x.m_vars, n_vars);
-        MLIR_LocationHandle op_loc = loc(x.base.loc);
+        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
         last_value = ASR_CreateNullifyOp(&ctx, op_loc, vars);
         append_current_stmt(last_value);
     }
 
     void visit_OMPRegion(const ASR::OMPRegion_t &x) {
         int64_t region = (int64_t)x.m_region;
-        MLIR_ValueHandle clauses = emit_product_seq_value(x.m_clauses, x.n_clauses);
+        size_t n_clauses = x.n_clauses;
+        MLIR_ValueHandle clauses = MLIR_INVALID_HANDLE;
+        (void)x.m_clauses;
         MLIR_ValueHandle body = emit_stmt_seq_value(x.m_body, x.n_body);
-        MLIR_LocationHandle op_loc = loc(x.base.loc);
-        last_value = ASR_CreateOMPRegionOp(&ctx, op_loc, region, clauses, body);
-        append_current_stmt(last_value);
-    }
-
-    void visit_Print(const ASR::Print_t &x) {
-        MLIR_ValueHandle text = emit_expr(*x.m_text);
-        MLIR_LocationHandle op_loc = loc(x.base.loc);
-        last_value = ASR_CreatePrintOp(&ctx, op_loc, text);
+        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
+        last_value = ASR_CreateOMPRegionOp(&ctx, op_loc, region, nullptr, n_clauses, body);
         append_current_stmt(last_value);
     }
 
     void visit_ReAlloc(const ASR::ReAlloc_t &x) {
-        MLIR_ValueHandle args = emit_product_seq_value(x.m_args, x.n_args);
-        MLIR_LocationHandle op_loc = loc(x.base.loc);
-        last_value = ASR_CreateReAllocOp(&ctx, op_loc, args);
+        size_t n_args = x.n_args;
+        MLIR_ValueHandle args = MLIR_INVALID_HANDLE;
+        (void)x.m_args;
+        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
+        last_value = ASR_CreateReAllocOp(&ctx, op_loc, nullptr, n_args);
         append_current_stmt(last_value);
     }
 
     void visit_Return(const ASR::Return_t &x) {
-        MLIR_LocationHandle op_loc = loc(x.base.loc);
+        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
         last_value = ASR_CreateReturnOp(&ctx, op_loc);
         append_current_stmt(last_value);
     }
@@ -1787,37 +1762,43 @@
     void visit_Select(const ASR::Select_t &x) {
         string name = asr_cstr(x.m_name);
         MLIR_ValueHandle test = emit_expr(*x.m_test);
-        MLIR_ValueHandle body = emit_product_seq_value(x.m_body, x.n_body);
-        MLIR_ValueHandle default = emit_stmt_seq_value(x.m_default, x.n_default);
+        size_t n_body = x.n_body;
+        MLIR_ValueHandle body = MLIR_INVALID_HANDLE;
+        (void)x.m_body;
+        MLIR_ValueHandle default_ = emit_stmt_seq_value(x.m_default, x.n_default);
         bool enable_fall_through = x.m_enable_fall_through;
-        MLIR_LocationHandle op_loc = loc(x.base.loc);
-        last_value = ASR_CreateSelectOp(&ctx, op_loc, name, test, body, default, enable_fall_through);
+        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
+        last_value = ASR_CreateSelectOp(&ctx, op_loc, name, test, nullptr, n_body, default_, enable_fall_through);
         append_current_stmt(last_value);
     }
 
     void visit_SelectRank(const ASR::SelectRank_t &x) {
         string name = asr_cstr(x.m_name);
         MLIR_ValueHandle selector = emit_expr(*x.m_selector);
-        MLIR_ValueHandle body = emit_product_seq_value(x.m_body, x.n_body);
-        MLIR_ValueHandle default = emit_stmt_seq_value(x.m_default, x.n_default);
-        MLIR_LocationHandle op_loc = loc(x.base.loc);
-        last_value = ASR_CreateSelectRankOp(&ctx, op_loc, name, selector, body, default);
+        size_t n_body = x.n_body;
+        MLIR_ValueHandle body = MLIR_INVALID_HANDLE;
+        (void)x.m_body;
+        MLIR_ValueHandle default_ = emit_stmt_seq_value(x.m_default, x.n_default);
+        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
+        last_value = ASR_CreateSelectRankOp(&ctx, op_loc, name, selector, nullptr, n_body, default_);
         append_current_stmt(last_value);
     }
 
     void visit_SelectType(const ASR::SelectType_t &x) {
         MLIR_ValueHandle selector = emit_expr(*x.m_selector);
         string assoc_name = asr_cstr(x.m_assoc_name);
-        MLIR_ValueHandle body = emit_product_seq_value(x.m_body, x.n_body);
-        MLIR_ValueHandle default = emit_stmt_seq_value(x.m_default, x.n_default);
-        MLIR_LocationHandle op_loc = loc(x.base.loc);
-        last_value = ASR_CreateSelectTypeOp(&ctx, op_loc, selector, assoc_name, body, default);
+        size_t n_body = x.n_body;
+        MLIR_ValueHandle body = MLIR_INVALID_HANDLE;
+        (void)x.m_body;
+        MLIR_ValueHandle default_ = emit_stmt_seq_value(x.m_default, x.n_default);
+        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
+        last_value = ASR_CreateSelectTypeOp(&ctx, op_loc, selector, assoc_name, nullptr, n_body, default_);
         append_current_stmt(last_value);
     }
 
     void visit_SetClear(const ASR::SetClear_t &x) {
         MLIR_ValueHandle a = emit_expr(*x.m_a);
-        MLIR_LocationHandle op_loc = loc(x.base.loc);
+        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
         last_value = ASR_CreateSetClearOp(&ctx, op_loc, a);
         append_current_stmt(last_value);
     }
@@ -1825,7 +1806,7 @@
     void visit_SetInsert(const ASR::SetInsert_t &x) {
         MLIR_ValueHandle a = emit_expr(*x.m_a);
         MLIR_ValueHandle ele = emit_expr(*x.m_ele);
-        MLIR_LocationHandle op_loc = loc(x.base.loc);
+        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
         last_value = ASR_CreateSetInsertOp(&ctx, op_loc, a, ele);
         append_current_stmt(last_value);
     }
@@ -1833,7 +1814,7 @@
     void visit_SetRemove(const ASR::SetRemove_t &x) {
         MLIR_ValueHandle a = emit_expr(*x.m_a);
         MLIR_ValueHandle ele = emit_expr(*x.m_ele);
-        MLIR_LocationHandle op_loc = loc(x.base.loc);
+        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
         last_value = ASR_CreateSetRemoveOp(&ctx, op_loc, a, ele);
         append_current_stmt(last_value);
     }
@@ -1841,7 +1822,7 @@
     void visit_Stop(const ASR::Stop_t &x) {
         MLIR_ValueHandle code = MLIR_INVALID_HANDLE;
         if (x.m_code) { code = emit_expr(*x.m_code); }
-        MLIR_LocationHandle op_loc = loc(x.base.loc);
+        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
         last_value = ASR_CreateStopOp(&ctx, op_loc, code);
         append_current_stmt(last_value);
     }
@@ -1850,23 +1831,25 @@
         string name = emit_symbol_ref(*x.m_name);
         string original_name = str_lit("");
         if (x.m_original_name) { original_name = emit_symbol_ref(*x.m_original_name); }
-        MLIR_ValueHandle args = emit_product_seq_value(x.m_args, x.n_args);
+        size_t n_args = x.n_args;
+        MLIR_ValueHandle args = MLIR_INVALID_HANDLE;
+        (void)x.m_args;
         MLIR_ValueHandle dt = MLIR_INVALID_HANDLE;
         if (x.m_dt) { dt = emit_expr(*x.m_dt); }
         bool strict_bounds_checking = x.m_strict_bounds_checking;
-        MLIR_LocationHandle op_loc = loc(x.base.loc);
-        last_value = ASR_CreateSubroutineCallOp(&ctx, op_loc, name, original_name, args, dt, strict_bounds_checking);
+        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
+        last_value = ASR_CreateSubroutineCallOp(&ctx, op_loc, name, original_name, nullptr, n_args, dt, strict_bounds_checking);
         append_current_stmt(last_value);
     }
 
     void visit_SyncAll(const ASR::SyncAll_t &x) {
-        MLIR_LocationHandle op_loc = loc(x.base.loc);
+        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
         last_value = ASR_CreateSyncAllOp(&ctx, op_loc);
         append_current_stmt(last_value);
     }
 
     void visit_SyncMemory(const ASR::SyncMemory_t &x) {
-        MLIR_LocationHandle op_loc = loc(x.base.loc);
+        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
         last_value = ASR_CreateSyncMemoryOp(&ctx, op_loc);
         append_current_stmt(last_value);
     }
@@ -1875,7 +1858,7 @@
         MLIR_ValueHandle test = emit_expr(*x.m_test);
         MLIR_ValueHandle body = emit_stmt_seq_value(x.m_body, x.n_body);
         MLIR_ValueHandle orelse = emit_stmt_seq_value(x.m_orelse, x.n_orelse);
-        MLIR_LocationHandle op_loc = loc(x.base.loc);
+        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
         last_value = ASR_CreateWhereOp(&ctx, op_loc, test, body, orelse);
         append_current_stmt(last_value);
     }
@@ -1885,381 +1868,7 @@
         MLIR_ValueHandle test = emit_expr(*x.m_test);
         MLIR_ValueHandle body = emit_stmt_seq_value(x.m_body, x.n_body);
         MLIR_ValueHandle orelse = emit_stmt_seq_value(x.m_orelse, x.n_orelse);
-        MLIR_LocationHandle op_loc = loc(x.base.loc);
+        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
         last_value = ASR_CreateWhileLoopOp(&ctx, op_loc, name, test, body, orelse);
         append_current_stmt(last_value);
-    }
-
-    void visit_AssociateBlock(const ASR::AssociateBlock_t &x) {
-        MLIR_ValueHandle symtab = emit_product_value(*x.m_symtab);
-        string name = asr_cstr(x.m_name);
-        MLIR_ValueHandle body = emit_stmt_seq_value(x.m_body, x.n_body);
-        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
-        last_value = ASR_CreateAssociateBlockOp(&ctx, op_loc, symtab, name, body);
-    }
-
-    void visit_Block(const ASR::Block_t &x) {
-        MLIR_ValueHandle symtab = emit_product_value(*x.m_symtab);
-        string name = asr_cstr(x.m_name);
-        MLIR_ValueHandle body = emit_stmt_seq_value(x.m_body, x.n_body);
-        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
-        last_value = ASR_CreateBlockOp(&ctx, op_loc, symtab, name, body);
-    }
-
-    void visit_CustomOperator(const ASR::CustomOperator_t &x) {
-        MLIR_ValueHandle parent_symtab = emit_product_value(*x.m_parent_symtab);
-        string name = asr_cstr(x.m_name);
-        string procs = emit_symbol_seq_ref(x.m_procs, x.n_procs);
-        int64_t access = (int64_t)x.m_access;
-        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
-        last_value = ASR_CreateCustomOperatorOp(&ctx, op_loc, parent_symtab, name, procs, access);
-    }
-
-    void visit_Enum(const ASR::Enum_t &x) {
-        MLIR_ValueHandle symtab = emit_product_value(*x.m_symtab);
-        string name = asr_cstr(x.m_name);
-        string dependencies = emit_identifier_seq(x.m_dependencies, x.n_dependencies);
-        string members = emit_identifier_seq(x.m_members, x.n_members);
-        int64_t abi = (int64_t)x.m_abi;
-        int64_t access = (int64_t)x.m_access;
-        int64_t enum_value_type = (int64_t)x.m_enum_value_type;
-        MLIR_TypeHandle type = convert_type(*x.m_type);
-        string parent = str_lit("");
-        if (x.m_parent) { parent = emit_symbol_ref(*x.m_parent); }
-        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
-        last_value = ASR_CreateEnumOp(&ctx, op_loc, symtab, name, dependencies, members, abi, access, enum_value_type, type, parent);
-    }
-
-    void visit_ExternalSymbol(const ASR::ExternalSymbol_t &x) {
-        MLIR_ValueHandle parent_symtab = emit_product_value(*x.m_parent_symtab);
-        string name = asr_cstr(x.m_name);
-        string external = emit_symbol_ref(*x.m_external);
-        string module_name = asr_cstr(x.m_module_name);
-        string scope_names = emit_identifier_seq(x.m_scope_names, x.n_scope_names);
-        string original_name = asr_cstr(x.m_original_name);
-        int64_t access = (int64_t)x.m_access;
-        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
-        last_value = ASR_CreateExternalSymbolOp(&ctx, op_loc, parent_symtab, name, external, module_name, scope_names, original_name, access);
-    }
-
-    void visit_Function(const ASR::Function_t &x) {
-        MLIR_ValueHandle symtab = emit_product_value(*x.m_symtab);
-        string name = asr_cstr(x.m_name);
-        MLIR_TypeHandle function_signature = convert_type(*x.m_function_signature);
-        string dependencies = emit_identifier_seq(x.m_dependencies, x.n_dependencies);
-        size_t n_args = x.n_args;
-        MLIR_ValueHandle args = emit_expr_seq_value(x.m_args, n_args);
-        MLIR_ValueHandle body = emit_stmt_seq_value(x.m_body, x.n_body);
-        MLIR_ValueHandle return_var = MLIR_INVALID_HANDLE;
-        if (x.m_return_var) { return_var = emit_expr(*x.m_return_var); }
-        int64_t access = (int64_t)x.m_access;
-        bool deterministic = x.m_deterministic;
-        bool side_effect_free = x.m_side_effect_free;
-        string module_file = str_lit("");
-        if (x.m_module_file) { module_file = asr_cstr(x.m_module_file); }
-        MLIR_ValueHandle start_name = emit_product_value(*x.m_start_name);
-        MLIR_ValueHandle end_name = emit_product_value(*x.m_end_name);
-        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
-        last_value = ASR_CreateFunctionOp(&ctx, op_loc, symtab, name, function_signature, dependencies, args, body, return_var, access, deterministic, side_effect_free, module_file, start_name, end_name);
-    }
-
-    void visit_GenericProcedure(const ASR::GenericProcedure_t &x) {
-        MLIR_ValueHandle parent_symtab = emit_product_value(*x.m_parent_symtab);
-        string name = asr_cstr(x.m_name);
-        string procs = emit_symbol_seq_ref(x.m_procs, x.n_procs);
-        int64_t access = (int64_t)x.m_access;
-        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
-        last_value = ASR_CreateGenericProcedureOp(&ctx, op_loc, parent_symtab, name, procs, access);
-    }
-
-    void visit_GpuKernelFunction(const ASR::GpuKernelFunction_t &x) {
-        MLIR_ValueHandle symtab = emit_product_value(*x.m_symtab);
-        string name = asr_cstr(x.m_name);
-        MLIR_TypeHandle function_signature = convert_type(*x.m_function_signature);
-        string dependencies = emit_identifier_seq(x.m_dependencies, x.n_dependencies);
-        size_t n_args = x.n_args;
-        MLIR_ValueHandle args = emit_expr_seq_value(x.m_args, n_args);
-        MLIR_ValueHandle body = emit_stmt_seq_value(x.m_body, x.n_body);
-        int64_t access = (int64_t)x.m_access;
-        MLIR_ValueHandle start_name = emit_product_value(*x.m_start_name);
-        MLIR_ValueHandle end_name = emit_product_value(*x.m_end_name);
-        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
-        last_value = ASR_CreateGpuKernelFunctionOp(&ctx, op_loc, symtab, name, function_signature, dependencies, args, body, access, start_name, end_name);
-    }
-
-    void visit_Module(const ASR::Module_t &x) {
-        MLIR_ValueHandle symtab = emit_product_value(*x.m_symtab);
-        string name = asr_cstr(x.m_name);
-        string parent_module = asr_cstr(x.m_parent_module);
-        string dependencies = emit_identifier_seq(x.m_dependencies, x.n_dependencies);
-        bool loaded_from_mod = x.m_loaded_from_mod;
-        bool intrinsic = x.m_intrinsic;
-        bool has_submodules = x.m_has_submodules;
-        MLIR_ValueHandle start_name = emit_product_value(*x.m_start_name);
-        MLIR_ValueHandle end_name = emit_product_value(*x.m_end_name);
-        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
-        last_value = ASR_CreateModuleOp(&ctx, op_loc, symtab, name, parent_module, dependencies, loaded_from_mod, intrinsic, has_submodules, start_name, end_name);
-    }
-
-    void visit_Namelist(const ASR::Namelist_t &x) {
-        MLIR_ValueHandle parent_symtab = emit_product_value(*x.m_parent_symtab);
-        string group_name = asr_cstr(x.m_group_name);
-        string var_list = emit_symbol_seq_ref(x.m_var_list, x.n_var_list);
-        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
-        last_value = ASR_CreateNamelistOp(&ctx, op_loc, parent_symtab, group_name, var_list);
-    }
-
-    void visit_Program(const ASR::Program_t &x) {
-        MLIR_ValueHandle symtab = emit_product_value(*x.m_symtab);
-        string name = asr_cstr(x.m_name);
-        string dependencies = emit_identifier_seq(x.m_dependencies, x.n_dependencies);
-        MLIR_ValueHandle body = emit_stmt_seq_value(x.m_body, x.n_body);
-        MLIR_ValueHandle start_name = emit_product_value(*x.m_start_name);
-        MLIR_ValueHandle end_name = emit_product_value(*x.m_end_name);
-        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
-        last_value = ASR_CreateProgramOp(&ctx, op_loc, symtab, name, dependencies, body, start_name, end_name);
-    }
-
-    void visit_Requirement(const ASR::Requirement_t &x) {
-        MLIR_ValueHandle symtab = emit_product_value(*x.m_symtab);
-        string name = asr_cstr(x.m_name);
-        string args = emit_identifier_seq(x.m_args, x.n_args);
-        MLIR_ValueHandle requires = emit_product_seq_value(x.m_requires, x.n_requires);
-        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
-        last_value = ASR_CreateRequirementOp(&ctx, op_loc, symtab, name, args, requires);
-    }
-
-    void visit_Struct(const ASR::Struct_t &x) {
-        MLIR_ValueHandle symtab = emit_product_value(*x.m_symtab);
-        string name = asr_cstr(x.m_name);
-        MLIR_TypeHandle struct_signature = convert_type(*x.m_struct_signature);
-        string dependencies = emit_identifier_seq(x.m_dependencies, x.n_dependencies);
-        string members = emit_identifier_seq(x.m_members, x.n_members);
-        string member_functions = emit_identifier_seq(x.m_member_functions, x.n_member_functions);
-        int64_t abi = (int64_t)x.m_abi;
-        int64_t access = (int64_t)x.m_access;
-        bool is_packed = x.m_is_packed;
-        bool is_abstract = x.m_is_abstract;
-        MLIR_ValueHandle initializers = emit_product_seq_value(x.m_initializers, x.n_initializers);
-        MLIR_ValueHandle alignment = MLIR_INVALID_HANDLE;
-        if (x.m_alignment) { alignment = emit_expr(*x.m_alignment); }
-        string parent = str_lit("");
-        if (x.m_parent) { parent = emit_symbol_ref(*x.m_parent); }
-        string kind_params = emit_identifier_seq(x.m_kind_params, x.n_kind_params);
-        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
-        last_value = ASR_CreateStructOp(&ctx, op_loc, symtab, name, struct_signature, dependencies, members, member_functions, abi, access, is_packed, is_abstract, initializers, alignment, parent, kind_params);
-    }
-
-    void visit_StructMethodDeclaration(const ASR::StructMethodDeclaration_t &x) {
-        MLIR_ValueHandle parent_symtab = emit_product_value(*x.m_parent_symtab);
-        string name = asr_cstr(x.m_name);
-        string self_argument = asr_cstr(x.m_self_argument);
-        string proc_name = asr_cstr(x.m_proc_name);
-        string proc = emit_symbol_ref(*x.m_proc);
-        int64_t abi = (int64_t)x.m_abi;
-        bool is_deferred = x.m_is_deferred;
-        bool is_nopass = x.m_is_nopass;
-        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
-        last_value = ASR_CreateStructMethodDeclarationOp(&ctx, op_loc, parent_symtab, name, self_argument, proc_name, proc, abi, is_deferred, is_nopass);
-    }
-
-    void visit_Template(const ASR::Template_t &x) {
-        MLIR_ValueHandle symtab = emit_product_value(*x.m_symtab);
-        string name = asr_cstr(x.m_name);
-        string args = emit_identifier_seq(x.m_args, x.n_args);
-        MLIR_ValueHandle requires = emit_product_seq_value(x.m_requires, x.n_requires);
-        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
-        last_value = ASR_CreateTemplateOp(&ctx, op_loc, symtab, name, args, requires);
-    }
-
-    void visit_Union(const ASR::Union_t &x) {
-        MLIR_ValueHandle symtab = emit_product_value(*x.m_symtab);
-        string name = asr_cstr(x.m_name);
-        string dependencies = emit_identifier_seq(x.m_dependencies, x.n_dependencies);
-        string members = emit_identifier_seq(x.m_members, x.n_members);
-        int64_t abi = (int64_t)x.m_abi;
-        int64_t access = (int64_t)x.m_access;
-        MLIR_ValueHandle initializers = emit_product_seq_value(x.m_initializers, x.n_initializers);
-        string parent = str_lit("");
-        if (x.m_parent) { parent = emit_symbol_ref(*x.m_parent); }
-        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
-        last_value = ASR_CreateUnionOp(&ctx, op_loc, symtab, name, dependencies, members, abi, access, initializers, parent);
-    }
-
-    void visit_Variable(const ASR::Variable_t &x) {
-        MLIR_ValueHandle parent_symtab = emit_product_value(*x.m_parent_symtab);
-        string name = asr_cstr(x.m_name);
-        string dependencies = emit_identifier_seq(x.m_dependencies, x.n_dependencies);
-        int64_t intent = (int64_t)x.m_intent;
-        MLIR_ValueHandle symbolic_value = MLIR_INVALID_HANDLE;
-        if (x.m_symbolic_value) { symbolic_value = emit_expr(*x.m_symbolic_value); }
-        MLIR_ValueHandle value = MLIR_INVALID_HANDLE;
-        if (x.m_value) { value = emit_expr(*x.m_value); }
-        int64_t storage = (int64_t)x.m_storage;
-        MLIR_TypeHandle type = convert_type(*x.m_type);
-        string type_declaration = str_lit("");
-        if (x.m_type_declaration) { type_declaration = emit_symbol_ref(*x.m_type_declaration); }
-        int64_t abi = (int64_t)x.m_abi;
-        int64_t access = (int64_t)x.m_access;
-        int64_t presence = (int64_t)x.m_presence;
-        bool value_attr = x.m_value_attr;
-        bool target_attr = x.m_target_attr;
-        bool contiguous_attr = x.m_contiguous_attr;
-        string bindc_name = str_lit("");
-        if (x.m_bindc_name) { bindc_name = asr_cstr(x.m_bindc_name); }
-        bool is_volatile = x.m_is_volatile;
-        bool is_protected = x.m_is_protected;
-        int64_t pass_attr = (int64_t)x.m_pass_attr;
-        string self_argument = asr_cstr(x.m_self_argument);
-        MLIR_ValueHandle codims = emit_product_seq_value(x.m_codims, x.n_codims);
-        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
-        last_value = ASR_CreateVariableOp(&ctx, op_loc, parent_symtab, name, dependencies, intent, symbolic_value, value, storage, type, type_declaration, abi, access, presence, value_attr, target_attr, contiguous_attr, bindc_name, is_volatile, is_protected, pass_attr, self_argument, codims);
-    }
-
-    void visit_Allocatable(const ASR::Allocatable_t &x) {
-        MLIR_TypeHandle type = convert_type(*x.m_type);
-        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
-        last_value = ASR_CreateAllocatableOp(&ctx, op_loc, type);
-    }
-
-    void visit_Array(const ASR::Array_t &x) {
-        MLIR_TypeHandle type = convert_type(*x.m_type);
-        MLIR_ValueHandle dims = emit_product_seq_value(x.m_dims, x.n_dims);
-        int64_t physical_type = (int64_t)x.m_physical_type;
-        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
-        last_value = ASR_CreateArrayOp(&ctx, op_loc, type, dims, physical_type);
-    }
-
-    void visit_CPtr(const ASR::CPtr_t &x) {
-        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
-        last_value = ASR_CreateCPtrOp(&ctx, op_loc);
-    }
-
-    void visit_Complex(const ASR::Complex_t &x) {
-        int64_t kind = x.m_kind;
-        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
-        last_value = ASR_CreateComplexOp(&ctx, op_loc, kind);
-    }
-
-    void visit_Dict(const ASR::Dict_t &x) {
-        MLIR_TypeHandle key_type = convert_type(*x.m_key_type);
-        MLIR_TypeHandle value_type = convert_type(*x.m_value_type);
-        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
-        last_value = ASR_CreateDictOp(&ctx, op_loc, key_type, value_type);
-    }
-
-    void visit_EnumType(const ASR::EnumType_t &x) {
-        string enum_type = emit_symbol_ref(*x.m_enum_type);
-        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
-        last_value = ASR_CreateEnumTypeOp(&ctx, op_loc, enum_type);
-    }
-
-    void visit_FunctionType(const ASR::FunctionType_t &x) {
-        MLIR_TypeHandle arg_types = emit_type_seq_value(x.m_arg_types, x.n_arg_types);
-        MLIR_TypeHandle return_var_type = MLIR_INVALID_HANDLE;
-        if (x.m_return_var_type) { return_var_type = convert_type(*x.m_return_var_type); }
-        int64_t abi = (int64_t)x.m_abi;
-        int64_t deftype = (int64_t)x.m_deftype;
-        string bindc_name = str_lit("");
-        if (x.m_bindc_name) { bindc_name = asr_cstr(x.m_bindc_name); }
-        bool elemental = x.m_elemental;
-        bool pure = x.m_pure;
-        bool module = x.m_module;
-        bool inline = x.m_inline;
-        bool static = x.m_static;
-        string restrictions = emit_symbol_seq_ref(x.m_restrictions, x.n_restrictions);
-        bool is_restriction = x.m_is_restriction;
-        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
-        last_value = ASR_CreateFunctionTypeOp(&ctx, op_loc, arg_types, return_var_type, abi, deftype, bindc_name, elemental, pure, module, inline, static, restrictions, is_restriction);
-    }
-
-    void visit_Integer(const ASR::Integer_t &x) {
-        int64_t kind = x.m_kind;
-        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
-        last_value = ASR_CreateIntegerOp(&ctx, op_loc, kind);
-    }
-
-    void visit_List(const ASR::List_t &x) {
-        MLIR_TypeHandle type = convert_type(*x.m_type);
-        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
-        last_value = ASR_CreateListOp(&ctx, op_loc, type);
-    }
-
-    void visit_Logical(const ASR::Logical_t &x) {
-        int64_t kind = x.m_kind;
-        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
-        last_value = ASR_CreateLogicalOp(&ctx, op_loc, kind);
-    }
-
-    void visit_Pointer(const ASR::Pointer_t &x) {
-        MLIR_TypeHandle type = convert_type(*x.m_type);
-        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
-        last_value = ASR_CreatePointerOp(&ctx, op_loc, type);
-    }
-
-    void visit_Real(const ASR::Real_t &x) {
-        int64_t kind = x.m_kind;
-        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
-        last_value = ASR_CreateRealOp(&ctx, op_loc, kind);
-    }
-
-    void visit_Set(const ASR::Set_t &x) {
-        MLIR_TypeHandle type = convert_type(*x.m_type);
-        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
-        last_value = ASR_CreateSetOp(&ctx, op_loc, type);
-    }
-
-    void visit_String(const ASR::String_t &x) {
-        int64_t kind = x.m_kind;
-        MLIR_ValueHandle len = MLIR_INVALID_HANDLE;
-        if (x.m_len) { len = emit_expr(*x.m_len); }
-        int64_t len_kind = (int64_t)x.m_len_kind;
-        int64_t physical_type = (int64_t)x.m_physical_type;
-        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
-        last_value = ASR_CreateStringOp(&ctx, op_loc, kind, len, len_kind, physical_type);
-    }
-
-    void visit_StructType(const ASR::StructType_t &x) {
-        MLIR_TypeHandle data_member_types = emit_type_seq_value(x.m_data_member_types, x.n_data_member_types);
-        MLIR_TypeHandle member_function_types = emit_type_seq_value(x.m_member_function_types, x.n_member_function_types);
-        bool is_cstruct = x.m_is_cstruct;
-        bool is_unlimited_polymorphic = x.m_is_unlimited_polymorphic;
-        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
-        last_value = ASR_CreateStructTypeOp(&ctx, op_loc, data_member_types, member_function_types, is_cstruct, is_unlimited_polymorphic);
-    }
-
-    void visit_SymbolicExpression(const ASR::SymbolicExpression_t &x) {
-        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
-        last_value = ASR_CreateSymbolicExpressionOp(&ctx, op_loc);
-    }
-
-    void visit_Tuple(const ASR::Tuple_t &x) {
-        MLIR_TypeHandle type = emit_type_seq_value(x.m_type, x.n_type);
-        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
-        last_value = ASR_CreateTupleOp(&ctx, op_loc, type);
-    }
-
-    void visit_TypeParameter(const ASR::TypeParameter_t &x) {
-        string param = asr_cstr(x.m_param);
-        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
-        last_value = ASR_CreateTypeParameterOp(&ctx, op_loc, param);
-    }
-
-    void visit_UnionType(const ASR::UnionType_t &x) {
-        MLIR_TypeHandle data_member_types = emit_type_seq_value(x.m_data_member_types, x.n_data_member_types);
-        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
-        last_value = ASR_CreateUnionTypeOp(&ctx, op_loc, data_member_types);
-    }
-
-    void visit_UnsignedInteger(const ASR::UnsignedInteger_t &x) {
-        int64_t kind = x.m_kind;
-        MLIR_LocationHandle op_loc = loc(x.base.base.loc);
-        last_value = ASR_CreateUnsignedIntegerOp(&ctx, op_loc, kind);
-    }
-
-    void visit_TranslationUnit(const ASR::TranslationUnit_t &x) {
-        MLIR_ValueHandle symtab = emit_product_value(*x.m_symtab);
-        MLIR_ValueHandle items = emit_product_seq_value(x.m_items, x.n_items);
-        MLIR_LocationHandle op_loc = default_loc();
-        last_value = ASR_CreateTranslationUnitOp(&ctx, op_loc, symtab, items);
     }

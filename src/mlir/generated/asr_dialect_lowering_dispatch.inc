@@ -39,6 +39,8 @@ bool ASR_DialectLowerOneOp(ASR_LoweringContext *ctx, MLIR_OpHandle op) {
         return ASR_LowerIntrinsicElementalFunction(ctx, op);
     case ASR_DIALECT_OP_EXPR_INTRINSICIMPUREFUNCTION:
         return ASR_LowerIntrinsicImpureFunction(ctx, op);
+    case ASR_DIALECT_OP_EXPR_LOGICALBINOP:
+        return ASR_LowerLogicalBinOp(ctx, op);
     case ASR_DIALECT_OP_EXPR_LOGICALCOMPARE:
         return ASR_LowerLogicalCompare(ctx, op);
     case ASR_DIALECT_OP_EXPR_LOGICALCONSTANT:
@@ -53,6 +55,8 @@ bool ASR_DialectLowerOneOp(ASR_LoweringContext *ctx, MLIR_OpHandle op) {
         return ASR_LowerRealConstant(ctx, op);
     case ASR_DIALECT_OP_EXPR_REALUNARYMINUS:
         return ASR_LowerRealUnaryMinus(ctx, op);
+    case ASR_DIALECT_OP_EXPR_STRINGFORMAT:
+        return ASR_LowerStringFormat(ctx, op);
     case ASR_DIALECT_OP_EXPR_VAR:
         return ASR_LowerVar(ctx, op);
     case ASR_DIALECT_OP_STMT_ALLOCATE:
@@ -63,6 +67,8 @@ bool ASR_DialectLowerOneOp(ASR_LoweringContext *ctx, MLIR_OpHandle op) {
         return ASR_LowerDoLoop(ctx, op);
     case ASR_DIALECT_OP_STMT_ERRORSTOP:
         return ASR_LowerErrorStop(ctx, op);
+    case ASR_DIALECT_OP_STMT_FILEWRITE:
+        return ASR_LowerFileWrite(ctx, op);
     case ASR_DIALECT_OP_STMT_IF:
         return ASR_LowerIf(ctx, op);
     case ASR_DIALECT_OP_STMT_INTRINSICIMPURESUBROUTINE:
