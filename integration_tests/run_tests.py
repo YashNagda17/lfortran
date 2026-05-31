@@ -10,7 +10,7 @@ SUPPORTED_BACKENDS = ['llvm', 'llvm2', 'llvm_rtlib', 'c', 'cpp', 'x86', 'wasm',
                       'gfortran', 'flang', 'llvmImplicit', 'llvmStackArray', 'llvm_integer_8',
                       'llvm_infer', 'fortran', 'c_nopragma', 'llvm_nopragma',
                       'llvm_wasm', 'llvm_wasm_emcc', 'llvm_omp', 'llvm_submodule',
-                      'mlir', 'mlir_omp', 'mlir_llvm_omp', 'llvm_goc',
+                      'mlir', 'mlir_new', 'mlir_omp', 'mlir_llvm_omp', 'llvm_goc',
                       'target_offload', 'llvm_single_invocation', 'metal', 'cuda']
 SUPPORTED_STANDARDS = ['lf', 'f23', 'legacy']
 BASE_DIR = os.path.dirname(os.path.realpath(__file__))
