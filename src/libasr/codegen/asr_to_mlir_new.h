@@ -7,8 +7,19 @@
 
 namespace LCompilers {
 
+    // How far the mlir-new pipeline runs before returning (like --show-asr vs
+    // --show-llvm stopping at different compiler stages).
+    enum class MlirNewPipelineTarget {
+        AsrDialect,
+        HighMlir,
+        LlvmDialect,
+        LlvmIr,
+        ObjectFile,
+    };
+
     Result<std::unique_ptr<MLIRModule>> asr_to_mlir_new(Allocator &al,
-        ASR::asr_t &asr, diag::Diagnostics &diagnostics);
+        ASR::asr_t &asr, diag::Diagnostics &diagnostics,
+        MlirNewPipelineTarget target = MlirNewPipelineTarget::ObjectFile);
 
 } // namespace LCompilers
 
