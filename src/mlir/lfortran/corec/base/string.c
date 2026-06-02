@@ -34,9 +34,9 @@ string str_substr(string str, uint64_t min, uint64_t size) {
     return (string){str.str+min, size};
 }
 
-string int_to_string(Arena *arena, int value) {
+string int_to_string(Arena *arena, int64_t value) {
     char buf[32];
-    size_t len = int_to_str(value, buf);
+    size_t len = int64_to_str(value, buf);
     char *str = arena_new_array(arena, char, len);
     base_memcpy(str, buf, len);
     return (string){str, len};

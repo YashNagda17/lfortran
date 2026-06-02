@@ -25,14 +25,27 @@
 //   * WASM:    Clang lowers them to the native memory.copy / memory.fill
 //              instructions.
 //
-// The implementations are intentionally simple byte loops so the compiler
-// will not turn them back into self-recursive memcpy/memset calls via
-// loop-idiom recognition at higher optimization levels.
+// The implementations are tight byte loops. At -O3 -flto clang's
+// loop-idiom-recognition pass DOES recognise these as memcpy/memset
+// patterns and would rewrite the loop body as a call to memcpy/memset
+// itself — which, in a freestanding build where these very functions
+// are the only memcpy/memset definitions in the binary, results in
+// unbounded recursion (stack overflow / SIGSEGV) the first time
+// anything calls memset.
 //
-// They are marked weak so a higher layer (for example a C standard library
-// subset that wraps memcpy()/memset() around base_memcpy()/base_memset())
-// can provide its own strong definitions without colliding with these at
-// link time. Code that only links against corec gets these unconditionally.
+// Per-function workaround: insert a volatile asm barrier in each
+// iteration. Volatile asm with a "memory" clobber has side effects
+// the optimiser must preserve, which prevents loop-idiom-recognition
+// from treating the loop body as a pure byte-copy or byte-fill
+// pattern. Tested against clang 20 -O3 -flto on x86_64-linux-gnu:
+// the generated machine code for memcpy/memset is a vectorised byte
+// loop with no call instruction inside.
+//
+// They are marked weak so a higher layer (for example a C standard
+// library subset that wraps memcpy()/memset() around
+// base_memcpy()/base_memset()) can provide its own strong definitions
+// without colliding with these at link time. Code that only links
+// against corec gets these unconditionally.
 //
 // Hosted LFortran (PLATFORM_HOSTED) must not define these: weak shims can
 // interact badly with glibc IFUNC/GOT resolution when linked into a normal
@@ -42,14 +55,20 @@ __attribute__((weak))
 void* memcpy(void* dest, const void* src, size_t n) {
     unsigned char* d = (unsigned char*)dest;
     const unsigned char* s = (const unsigned char*)src;
-    for (size_t i = 0; i < n; i++) d[i] = s[i];
+    for (size_t i = 0; i < n; i++) {
+        d[i] = s[i];
+        __asm__ volatile("" ::: "memory");
+    }
     return dest;
 }
 
 __attribute__((weak))
 void* memset(void* s, int c, size_t n) {
     unsigned char* p = (unsigned char*)s;
-    for (size_t i = 0; i < n; i++) p[i] = (unsigned char)c;
+    for (size_t i = 0; i < n; i++) {
+        p[i] = (unsigned char)c;
+        __asm__ volatile("" ::: "memory");
+    }
     return s;
 }
 #endif

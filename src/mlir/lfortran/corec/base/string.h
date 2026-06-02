@@ -26,7 +26,7 @@ char *str_to_cstr_copy(Arena *arena, string str);
 bool str_eq(string a, string b);
 string str_substr(string str, uint64_t min, uint64_t max);
 
-string int_to_string(Arena *arena, int value);
+string int_to_string(Arena *arena, int64_t value);
 string uint_to_string(Arena *arena, uint64_t value);
 string double_to_string(Arena *arena, double value, int precision);
 string char_to_string(Arena *arena, char c);
