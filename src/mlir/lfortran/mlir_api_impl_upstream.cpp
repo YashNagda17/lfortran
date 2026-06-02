@@ -306,6 +306,11 @@ inline void resetBlockOpCache() {
 // -----------------------------------------------------------------------------
 
 extern "C" void MLIR_InitApi(MLIR_Context *, MLIR_OpHandle) {}
+// The native implementation keeps process-wide intern/dedup registries that
+// reference the active arena; multi-pass pipelines reset them before swapping
+// arenas. The upstream implementation has no such global state, so this is a
+// no-op here (provided only to satisfy the shared driver's link references).
+extern "C" void MLIR_ResetInternRegistry(void) {}
 extern "C" void MLIR_SetArenaAllocator(MLIR_Context *ctx, Arena *arena) { ctx->arena = arena; }
 extern "C" Arena *MLIR_GetArenaAllocator(MLIR_Context *ctx) { return ctx->arena; }
 
@@ -464,7 +469,13 @@ extern "C" MLIR_OpHandle MLIR_CreateOpWithSuccessors(
                                                 state.attributes.end());
 
     if (n_successors > 0 && n_successor_operands) {
-        if (nm == "cf.cond_br") {
+        if (nm == "cf.cond_br" || nm == "llvm.cond_br") {
+            // Both ops use AttrSizedOperandSegments with the layout
+            // [condition, trueDestOperands, falseDestOperands]; without the
+            // synthesized operandSegmentSizes the BranchOpInterface slices
+            // the forwarded operands wrongly (e.g. returns the condition as
+            // a successor operand), corrupting phi wiring for any block-arg
+            // edge — exactly what mem2reg introduces.
             llvm::SmallVector<int32_t, 4> seg;
             seg.push_back((int32_t)n_operands);
             for (size_t s = 0; s < n_successors; s++) {

@@ -137,26 +137,47 @@ static void ensure_fmt_g_nl(LowerState *st) {
     st->vp_fmt_g_nl = true;
 }
 
-// memref<1xi32> locals from mlir-new / minimal pipelines: lower to llvm.alloca
-// of [1 x i32], llvm.getelementptr, llvm.load / llvm.store. The native IR
-// uses ReplaceAllUsesOfValue without enforcing type equality on operands, so
+// memref<Nxi32> locals from mlir-new: lower to llvm.alloca of [N x i32],
+// llvm.getelementptr, llvm.load / llvm.store. The native IR uses
+// ReplaceAllUsesOfValue without enforcing type equality on operands, so
 // memref SSA can be replaced by !llvm.ptr before memref.load/store rewrite.
 
-static bool str_contains_substr(string s, const char *sub) {
-    size_t n = 0;
-    while (sub[n]) n++;
-    if (s.size < n) return false;
-    for (size_t i = 0; i + n <= s.size; i++) {
-        if (memcmp(s.str + i, sub, n) == 0) return true;
+static bool parse_memref_nxi32(string ts, uint64_t *n_out) {
+    const char *prefix = "memref<";
+    size_t plen = 7;
+    if (ts.size < plen + 5 + 1) return false;
+    if (memcmp(ts.str, prefix, plen) != 0) return false;
+    size_t i = plen;
+    uint64_t n = 0;
+    while (i < ts.size && ts.str[i] >= '0' && ts.str[i] <= '9') {
+        n = n * 10 + (uint64_t)(ts.str[i] - '0');
+        i++;
     }
-    return false;
+    if (n == 0) return false;
+    if (i + 4 >= ts.size) return false;
+    if (memcmp(ts.str + i, "xi32", 4) != 0) return false;
+    if (ts.str[i + 4] != '>') return false;
+    *n_out = n;
+    return true;
 }
 
-static bool is_memref_1xi32_type(string ts) {
-    if (name_eq(ts, "memref<1xi32>")) return true;
-    return ts.size >= 7 && str_contains_substr(ts, "1xi32") &&
-        ts.size >= 7 && ts.str[0] == 'm' && ts.str[1] == 'e' && ts.str[2] == 'm' &&
-        ts.str[3] == 'r' && ts.str[4] == 'e' && ts.str[5] == 'f' && ts.str[6] == '<';
+static bool get_i32_array_type_for_mem(MLIR_Context *ctx, MLIR_ValueHandle mem,
+                                       MLIR_TypeHandle i32ty,
+                                       MLIR_TypeHandle *arrty_out) {
+    MLIR_TypeHandle mty = MLIR_GetValueType(mem);
+    string ts = MLIR_GetTypeString(ctx, mty);
+    uint64_t n = 0;
+    if (parse_memref_nxi32(ts, &n)) {
+        *arrty_out = MLIR_CreateTypeLLVMArray(ctx, i32ty, n);
+        return true;
+    }
+    MLIR_OpHandle def = MLIR_GetValueDefiningOp(mem);
+    if (def == MLIR_INVALID_HANDLE) return false;
+    if (!name_eq(MLIR_GetOpName(def), "llvm.alloca")) return false;
+    MLIR_AttributeHandle eat = MLIR_GetOpAttributeByName(def, "elem_type");
+    if (eat == MLIR_INVALID_HANDLE) return false;
+    *arrty_out = MLIR_GetAttributeTypeValue(eat);
+    return *arrty_out != MLIR_INVALID_HANDLE;
 }
 
 static bool lower_memref_alloca(LowerState *st, MLIR_OpHandle op,
@@ -165,11 +186,12 @@ static bool lower_memref_alloca(LowerState *st, MLIR_OpHandle op,
     MLIR_ValueHandle old_res = MLIR_GetOpResult(op, 0);
     MLIR_TypeHandle mty = MLIR_GetValueType(old_res);
     string ts = MLIR_GetTypeString(st->ctx, mty);
-    if (!is_memref_1xi32_type(ts)) return false;
+    uint64_t n = 0;
+    if (!parse_memref_nxi32(ts, &n)) return false;
 
     MLIR_LocationHandle loc = MLIR_GetOpLocation(op);
     MLIR_TypeHandle i32ty = ty_i32(st->ctx);
-    MLIR_TypeHandle arrty = MLIR_CreateTypeLLVMArray(st->ctx, i32ty, 1);
+    MLIR_TypeHandle arrty = MLIR_CreateTypeLLVMArray(st->ctx, i32ty, n);
     MLIR_TypeHandle ptrty = MLIR_CreateTypeLLVMPointer(st->ctx);
     MLIR_TypeHandle i64ty = ty_i64(st->ctx);
 
@@ -206,10 +228,10 @@ static bool lower_memref_load(LowerState *st, MLIR_OpHandle op,
     if (MLIR_GetOpNumResults(op) != 1) return false;
     MLIR_ValueHandle mem = MLIR_GetOpOperand(op, 0);
     MLIR_ValueHandle idx = MLIR_GetOpOperand(op, 1);
-    (void)mem;
     MLIR_LocationHandle loc = MLIR_GetOpLocation(op);
     MLIR_TypeHandle i32ty = ty_i32(st->ctx);
-    MLIR_TypeHandle arrty = MLIR_CreateTypeLLVMArray(st->ctx, i32ty, 1);
+    MLIR_TypeHandle arrty = MLIR_INVALID_HANDLE;
+    if (!get_i32_array_type_for_mem(st->ctx, mem, i32ty, &arrty)) return false;
     MLIR_TypeHandle ptrty = MLIR_CreateTypeLLVMPointer(st->ctx);
 
     MLIR_ValueHandle gep_res = make_result_value(st->ctx, ptrty, loc);
@@ -249,7 +271,8 @@ static bool lower_memref_store(LowerState *st, MLIR_OpHandle op,
     MLIR_ValueHandle idx = MLIR_GetOpOperand(op, 2);
     MLIR_LocationHandle loc = MLIR_GetOpLocation(op);
     MLIR_TypeHandle i32ty = ty_i32(st->ctx);
-    MLIR_TypeHandle arrty = MLIR_CreateTypeLLVMArray(st->ctx, i32ty, 1);
+    MLIR_TypeHandle arrty = MLIR_INVALID_HANDLE;
+    if (!get_i32_array_type_for_mem(st->ctx, mem, i32ty, &arrty)) return false;
     MLIR_TypeHandle ptrty = MLIR_CreateTypeLLVMPointer(st->ctx);
 
     MLIR_ValueHandle gep_res = make_result_value(st->ctx, ptrty, loc);
