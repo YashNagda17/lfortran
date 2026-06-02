@@ -102,11 +102,75 @@ target_include_directories(lfortran_mlir_c_api PRIVATE
     ${MLIR_INCLUDE_DIRS}
 )
 if (DEFINED LFORTRAN_CXX_NO_RTTI_FLAG)
-    target_compile_options(lfortran_mlir_c_api PRIVATE ${LFORTRAN_CXX_NO_RTTI_FLAG})
+    target_compile_options(lfortran_mlir_c_api PRIVATE
+        $<$<COMPILE_LANGUAGE:CXX>:${LFORTRAN_CXX_NO_RTTI_FLAG}>)
 endif()
 
 target_link_libraries(lfortran_mlir_c_api PUBLIC
     lfortran_corec
     p::mlir
     p::llvm
+)
+
+# ---------------------------------------------------------------------------
+# ASR dialect (Design A): generated from ASR.asdl + native C API
+# ---------------------------------------------------------------------------
+
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+
+set(LF_ASR_ASDL ${CMAKE_CURRENT_SOURCE_DIR}/../libasr/ASR.asdl)
+set(LF_ASR_DIALECT_GEN ${CMAKE_CURRENT_SOURCE_DIR}/../libasr/asdl_to_asr_dialect.py)
+set(LF_ASR_DIALECT_MLIR_GEN ${CMAKE_CURRENT_SOURCE_DIR}/generated)
+set(LF_ASR_DIALECT_CODEGEN ${CMAKE_CURRENT_SOURCE_DIR}/../libasr/codegen)
+
+add_custom_command(
+    OUTPUT
+        ${LF_ASR_DIALECT_MLIR_GEN}/asr_dialect_schema.h
+        ${LF_ASR_DIALECT_MLIR_GEN}/asr_dialect_api_generated.h
+        ${LF_ASR_DIALECT_MLIR_GEN}/asr_dialect_lowering_dispatch.h
+        ${LF_ASR_DIALECT_MLIR_GEN}/asr_dialect_enum_print.h
+    COMMAND ${Python3_EXECUTABLE} ${LF_ASR_DIALECT_GEN}
+        --asdl ${LF_ASR_ASDL}
+        --out-mlir-dir ${LF_ASR_DIALECT_MLIR_GEN}
+        --out-codegen-dir ${LF_ASR_DIALECT_CODEGEN}
+    DEPENDS ${LF_ASR_ASDL} ${LF_ASR_DIALECT_GEN}
+    COMMENT "Generating ASR dialect artifacts from ASR.asdl"
+)
+
+add_custom_target(generate_asr_dialect
+    DEPENDS
+        ${LF_ASR_DIALECT_MLIR_GEN}/asr_dialect_schema.h
+        ${LF_ASR_DIALECT_MLIR_GEN}/asr_dialect_api_generated.h
+        ${LF_ASR_DIALECT_MLIR_GEN}/asr_dialect_lowering_dispatch.h
+        ${LF_ASR_DIALECT_MLIR_GEN}/asr_dialect_enum_print.h
+)
+
+add_library(lfortran_asr_dialect STATIC
+    lfortran/asr_dialect_api.c
+    lfortran/asr_dialect_api_native.c
+    lfortran/asr_dialect_module_storage.c
+    lfortran/asr_dialect_pretty_print.c
+    lfortran/asr_dialect_lowering_handlers.c
+    lfortran/asr_dialect_api_upstream.cpp
+)
+add_dependencies(lfortran_asr_dialect generate_asr_dialect)
+target_include_directories(lfortran_asr_dialect BEFORE PUBLIC
+    ${LF_MLIR_LFORTRAN}
+    ${LF_MLIR_UPSTREAM}
+    ${LF_MLIR_LFORTRAN}/corec
+    ${LF_MLIR_UPSTREAM}/corec
+    ${CMAKE_CURRENT_SOURCE_DIR}
+)
+target_include_directories(lfortran_asr_dialect PRIVATE
+    ${LLVM_INCLUDE_DIRS}
+    ${MLIR_INCLUDE_DIRS}
+)
+if (DEFINED LFORTRAN_CXX_NO_RTTI_FLAG)
+    set_source_files_properties(
+        lfortran/asr_dialect_api_upstream.cpp
+        PROPERTIES COMPILE_FLAGS ${LFORTRAN_CXX_NO_RTTI_FLAG})
+endif()
+target_link_libraries(lfortran_asr_dialect PUBLIC
+    lfortran_mlir_c_api
+    lfortran_corec
 )
