@@ -12,6 +12,7 @@
 #include <libasr/config.h>
 #include <libasr/diagnostics.h>
 #include <libasr/pass/pass_manager.h>
+#include <libasr/codegen/asr_to_mlir_new.h>
 #include <libasr/utils.h>
 
 namespace LCompilers {
@@ -114,7 +115,8 @@ public:
     Result<std::unique_ptr<MLIRModule>> get_mlir(
         ASR::asr_t &asr, diag::Diagnostics &diagnostics);
     Result<std::unique_ptr<MLIRModule>> get_mlir_new(
-        ASR::asr_t &asr, diag::Diagnostics &diagnostics);
+        ASR::asr_t &asr, diag::Diagnostics &diagnostics,
+        MlirNewPipelineTarget target = MlirNewPipelineTarget::ObjectFile);
     Result<std::string> get_fortran(const std::string &code,
         LocationManager &lm, diag::Diagnostics &diagnostics);
     Result<std::string> get_fmt(const std::string &code, LocationManager &lm,

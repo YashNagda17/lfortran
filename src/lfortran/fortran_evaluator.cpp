@@ -624,16 +624,18 @@ Result<std::unique_ptr<MLIRModule>> FortranEvaluator::get_mlir(
 
 Result<std::unique_ptr<MLIRModule>> FortranEvaluator::get_mlir_new(
 #ifdef HAVE_LFORTRAN_MLIR
-        ASR::asr_t &asr, diag::Diagnostics &diagnostics
+        ASR::asr_t &asr, diag::Diagnostics &diagnostics,
+        MlirNewPipelineTarget target
 #else
-        ASR::asr_t &/*asr*/, diag::Diagnostics &/*diagnostics*/
+        ASR::asr_t &/*asr*/, diag::Diagnostics &/*diagnostics*/,
+        MlirNewPipelineTarget /*target*/
 #endif
 ) {
 #ifdef HAVE_LFORTRAN_MLIR
     // Initial ASR only: no default ASR passes before mlir-new lowering.
     std::unique_ptr<LCompilers::MLIRModule> m;
     Result<std::unique_ptr<MLIRModule>> res = asr_to_mlir_new(al,
-        (ASR::asr_t &)asr, diagnostics);
+        (ASR::asr_t &)asr, diagnostics, target);
     if (res.ok) {
         m = std::move(res.result);
     } else {
@@ -641,7 +643,10 @@ Result<std::unique_ptr<MLIRModule>> FortranEvaluator::get_mlir_new(
         return res.error;
     }
 
-    m->mlir_to_llvm(*m->llvm_ctx);
+    if (target == MlirNewPipelineTarget::ObjectFile
+            || target == MlirNewPipelineTarget::LlvmIr) {
+        m->mlir_to_llvm(*m->llvm_ctx);
+    }
     return m;
 #else
     throw LCompilersException("MLIR is not enabled");
