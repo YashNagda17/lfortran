@@ -306,7 +306,8 @@ namespace LCompilers::CommandLineInterface {
             "Show high-level MLIR from `--backend=mlir-new` and exit; "
             "implies mlir-new pipeline when set alone")->group(group_output_debugging_options);
         app.add_flag("--show-mlir-asr-dialect", opts.show_mlir_asr_dialect,
-            "Deprecated; no effect (use --show-mlir-high-dialect)")->group(group_output_debugging_options);
+            "Show ASR MLIR dialect (stage 1) from `--backend=mlir-new` and exit; "
+            "implies mlir-new pipeline when set alone")->group(group_output_debugging_options);
         app.add_flag("--show-mlir-llvm-dialect", opts.show_mlir_llvm_dialect,
             "Show LLVM-dialect MLIR emitted by `--backend=mlir-new` and exit; "
             "implies mlir-new pipeline when set alone")->group(group_output_debugging_options);

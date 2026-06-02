@@ -45,7 +45,7 @@ namespace LCompilers::CommandLineInterface {
         bool show_llvm = false;
         bool show_mlir = false;
         bool show_mlir_high_dialect = false;
-        bool show_mlir_asr_dialect = false;  // deprecated; no effect
+        bool show_mlir_asr_dialect = false;
         bool show_mlir_llvm_dialect = false;
         bool show_llvm_from_mlir = false;
         bool show_cpp = false;
