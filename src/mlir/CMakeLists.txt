@@ -129,6 +129,7 @@ add_custom_command(
         ${LF_ASR_DIALECT_MLIR_GEN}/asr_dialect_api_generated.h
         ${LF_ASR_DIALECT_MLIR_GEN}/asr_dialect_lowering_dispatch.h
         ${LF_ASR_DIALECT_MLIR_GEN}/asr_dialect_enum_print.h
+        ${LF_ASR_DIALECT_MLIR_GEN}/asr_dialect_print_policy.h
     COMMAND ${Python3_EXECUTABLE} ${LF_ASR_DIALECT_GEN}
         --asdl ${LF_ASR_ASDL}
         --out-mlir-dir ${LF_ASR_DIALECT_MLIR_GEN}
@@ -143,15 +144,15 @@ add_custom_target(generate_asr_dialect
         ${LF_ASR_DIALECT_MLIR_GEN}/asr_dialect_api_generated.h
         ${LF_ASR_DIALECT_MLIR_GEN}/asr_dialect_lowering_dispatch.h
         ${LF_ASR_DIALECT_MLIR_GEN}/asr_dialect_enum_print.h
+        ${LF_ASR_DIALECT_MLIR_GEN}/asr_dialect_print_policy.h
 )
 
 add_library(lfortran_asr_dialect STATIC
     lfortran/asr_dialect_api.c
     lfortran/asr_dialect_api_native.c
-    lfortran/asr_dialect_module_storage.c
+    lfortran/asr_dialect_storage.c
     lfortran/asr_dialect_pretty_print.c
     lfortran/asr_dialect_lowering_handlers.c
-    lfortran/asr_dialect_api_upstream.cpp
 )
 add_dependencies(lfortran_asr_dialect generate_asr_dialect)
 target_include_directories(lfortran_asr_dialect BEFORE PUBLIC
@@ -165,11 +166,6 @@ target_include_directories(lfortran_asr_dialect PRIVATE
     ${LLVM_INCLUDE_DIRS}
     ${MLIR_INCLUDE_DIRS}
 )
-if (DEFINED LFORTRAN_CXX_NO_RTTI_FLAG)
-    set_source_files_properties(
-        lfortran/asr_dialect_api_upstream.cpp
-        PROPERTIES COMPILE_FLAGS ${LFORTRAN_CXX_NO_RTTI_FLAG})
-endif()
 target_link_libraries(lfortran_asr_dialect PUBLIC
     lfortran_mlir_c_api
     lfortran_corec

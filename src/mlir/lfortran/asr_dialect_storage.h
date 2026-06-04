@@ -1,11 +1,55 @@
-// Shared ASR dialect field readers (V1: module storage for op refs, attrs for metadata).
+// Internal ASR dialect storage and field access (V1).
+//
+// NOT part of the public compiler contract — use asr_dialect_api.h externally.
+//
+// Prototype contract:
+// - Side tables live on MLIR_Context::asr_module_storage (see ASR_ModuleStorageInit).
+// - ASR dialect text dumps are not reparsable without that storage for op refs/sequences.
+// - Lifetime: one Init/Clear pair per ASR dialect build/lowering on a context.
+// - Do not interleave two dialect builds on the same context without Clear between them.
+// - Scope regions (asr.symtab/metadata/body) are unregistered container ops; child lists
+//   are stored under field "ops" in side storage until true MLIR regions exist.
+//
+// Combines context-owned side tables with inline readers over storage + asr.* attrs.
 #pragma once
 
 #include "asr_dialect_api.h"
-#include "asr_dialect_module_storage.h"
 
 #include <stdio.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <stdbool.h>
 #include <string.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+// --- Module/context-owned side storage (implementation in asr_dialect_storage.c) ---
+
+void ASR_ModuleStorageInit(MLIR_Context *ctx);
+void ASR_ModuleStorageClear(MLIR_Context *ctx);
+
+void ASR_ModuleStorageSetFieldOp(
+    MLIR_OpHandle parent, const char *field, MLIR_OpHandle child);
+MLIR_OpHandle ASR_ModuleStorageGetFieldOp(
+    MLIR_OpHandle parent, const char *field);
+
+void ASR_ModuleStorageSetFieldOpSeq(
+    MLIR_OpHandle parent, const char *field,
+    MLIR_OpHandle *ops, size_t n);
+MLIR_OpHandle *ASR_ModuleStorageGetFieldOpSeq(
+    MLIR_OpHandle parent, const char *field, size_t *n_out);
+
+void ASR_ModuleStorageSetTypeInfo(
+    MLIR_TypeHandle ty, int64_t asr_kind, bool is_array, int64_t array_len);
+bool ASR_ModuleStorageGetTypeInfo(
+    MLIR_TypeHandle ty, int64_t *asr_kind_out,
+    bool *is_array_out, int64_t *array_len_out);
+
+#ifdef __cplusplus
+}
+#endif
 
 #define ASR_DIALECT_META_PREFIX "asr."
 
@@ -113,10 +157,27 @@ static inline size_t asr_get_field_op_seq_count(MLIR_OpHandle op, const char *fi
     if (ASR_ModuleStorageGetFieldOpSeq(op, field, &n)) {
         return n;
     }
-    return asr_get_field_i64(op, "n_args", 0);
+    return (size_t)asr_get_field_i64(op, "n_args", 0);
+}
+
+static inline int64_t asr_get_type_kind_attr(MLIR_OpHandle var_op) {
+    if (asr_field_attr_present(var_op, "type_kind")) {
+        return asr_get_field_i64(var_op, "type_kind", 0);
+    }
+    MLIR_TypeHandle ty = asr_get_field_type(var_op, "type");
+    int64_t kind = 0;
+    bool is_array = false;
+    int64_t len = 0;
+    if (ASR_ModuleStorageGetTypeInfo(ty, &kind, &is_array, &len)) {
+        return kind;
+    }
+    return 0;
 }
 
 static inline int64_t asr_get_array_len_attr(MLIR_OpHandle var_op) {
+    if (asr_field_attr_present(var_op, "array_len")) {
+        return asr_get_field_i64(var_op, "array_len", 0);
+    }
     MLIR_TypeHandle ty = asr_get_field_type(var_op, "type");
     int64_t kind = 0;
     bool is_array = false;
@@ -124,7 +185,7 @@ static inline int64_t asr_get_array_len_attr(MLIR_OpHandle var_op) {
     if (ASR_ModuleStorageGetTypeInfo(ty, &kind, &is_array, &len) && is_array) {
         return len;
     }
-    return asr_get_field_i64(var_op, "array_len", 0);
+    return 0;
 }
 
 static inline size_t asr_get_seq_n_args_attr(MLIR_OpHandle op) {
@@ -136,11 +197,16 @@ static inline size_t asr_get_seq_n_args_attr(MLIR_OpHandle op) {
 }
 
 static inline size_t asr_get_body_count(MLIR_OpHandle op) {
-    return ASR_ModuleStorageBodyCount(op);
+    return asr_get_field_op_seq_count(op, "body");
 }
 
 static inline MLIR_OpHandle asr_get_body_op(MLIR_OpHandle op, size_t index) {
-    return ASR_ModuleStorageBodyOp(op, index);
+    size_t n = 0;
+    MLIR_OpHandle *seq = ASR_ModuleStorageGetFieldOpSeq(op, "body", &n);
+    if (!seq || index >= n) {
+        return MLIR_INVALID_HANDLE;
+    }
+    return seq[index];
 }
 
 static inline bool asr_op_name_is(MLIR_OpHandle op, const char *name) {

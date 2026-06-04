@@ -4,7 +4,7 @@
 // attribute. Child expression/statement references and statement bodies live in
 // module-owned side storage, not pointer-shaped integer attributes.
 #include "asr_dialect_api.h"
-#include "asr_dialect_module_storage.h"
+#include "asr_dialect_storage.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -173,6 +173,11 @@ MLIR_OpHandle ASR_DialectCreateOpNative(
     }
 
     for (size_t i = 0; i < n_fields; ++i) {
+        if (field_is_op_seq(fields[i].kind)) {
+            ASR_ModuleStorageSetFieldOpSeq(op, fields[i].name,
+                fields[i].value.op_seq.items, fields[i].value.op_seq.n_items);
+            continue;
+        }
         if (field_is_op_ref(fields[i].kind) &&
                 fields[i].value.op != MLIR_INVALID_HANDLE) {
             ASR_ModuleStorageSetFieldOp(op, fields[i].name, fields[i].value.op);
@@ -300,6 +305,150 @@ static bool verify_scope_region_tree(
     return true;
 }
 
+#define ASR_VERIFY_MAX_SYMS 512
+
+typedef struct {
+    char names[ASR_VERIFY_MAX_SYMS][128];
+    size_t n;
+} ASR_VerifySymSet;
+
+static bool verify_sym_name_eq(string a, const char *b) {
+    size_t blen = strlen(b);
+    return a.size == blen && a.str && memcmp(a.str, b, blen) == 0;
+}
+
+static bool verify_symset_has(const ASR_VerifySymSet *set, string name) {
+    if (!name.str || name.size == 0) {
+        return false;
+    }
+    for (size_t i = 0; i < set->n; ++i) {
+        if (verify_sym_name_eq(name, set->names[i])) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static bool verify_symset_add(ASR_VerifySymSet *set, string name) {
+    if (!name.str || name.size == 0) {
+        return false;
+    }
+    if (verify_symset_has(set, name)) {
+        return false;
+    }
+    if (set->n >= ASR_VERIFY_MAX_SYMS) {
+        return false;
+    }
+    size_t n = name.size < 127 ? name.size : 127;
+    memcpy(set->names[set->n], name.str, n);
+    set->names[set->n][n] = '\0';
+    set->n++;
+    return true;
+}
+
+static bool verify_collect_symtab(MLIR_OpHandle symtab, ASR_VerifySymSet *set) {
+    size_t n = 0;
+    MLIR_OpHandle *ops = asr_get_scope_region_ops(symtab, &n);
+    if (!ops) {
+        return true;
+    }
+    for (size_t i = 0; i < n; ++i) {
+        ASR_DialectOpKind k = ASR_DialectGetOpKindNative(ops[i]);
+        if (k == ASR_DIALECT_OP_SYMBOL_VARIABLE) {
+            if (!verify_symset_add(set, asr_get_field_str(ops[i], "name"))) {
+                return false;
+            }
+        } else if (k == ASR_DIALECT_OP_SYMBOL_FUNCTION) {
+            MLIR_OpHandle fn_symtab = asr_get_scope_region(ops[i], "symtab");
+            if (fn_symtab != MLIR_INVALID_HANDLE &&
+                    !verify_collect_symtab(fn_symtab, set)) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+static bool verify_var_refs_in_op(MLIR_OpHandle op, const ASR_VerifySymSet *set,
+        int depth);
+
+static bool verify_var_refs_in_scope_region(MLIR_OpHandle region,
+        const ASR_VerifySymSet *set, int depth) {
+    size_t n = 0;
+    MLIR_OpHandle *ops = asr_get_scope_region_ops(region, &n);
+    for (size_t i = 0; i < n; ++i) {
+        if (!verify_var_refs_in_op(ops[i], set, depth)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+static bool verify_var_refs_in_op(MLIR_OpHandle op, const ASR_VerifySymSet *set,
+        int depth) {
+    if (op == MLIR_INVALID_HANDLE || depth > 64) {
+        return true;
+    }
+    ASR_DialectOpKind kind = ASR_DialectGetOpKindNative(op);
+    if (kind == ASR_DIALECT_OP_EXPR_VAR) {
+        string sym = asr_get_field_str(op, "v");
+        return verify_symset_has(set, sym);
+    }
+    if (kind == ASR_DIALECT_OP_SYMBOL_PROGRAM ||
+            kind == ASR_DIALECT_OP_SYMBOL_FUNCTION) {
+        MLIR_OpHandle body = asr_get_scope_region(op, "body");
+        if (body != MLIR_INVALID_HANDLE &&
+                !verify_var_refs_in_scope_region(body, set, depth + 1)) {
+            return false;
+        }
+        return true;
+    }
+    const ASR_DialectOpSchema *schema = ASR_DialectLookupSchema(kind);
+    if (!schema) {
+        if (is_scope_region_op(op)) {
+            return verify_var_refs_in_scope_region(op, set, depth + 1);
+        }
+        return true;
+    }
+    for (size_t i = 0; i < schema->n_fields; ++i) {
+        const ASR_DialectFieldDesc *fd = &schema->fields[i];
+        if (field_is_op_ref(fd->kind)) {
+            MLIR_OpHandle child = ASR_ModuleStorageGetFieldOp(op, fd->name);
+            if (child != MLIR_INVALID_HANDLE &&
+                    !verify_var_refs_in_op(child, set, depth + 1)) {
+                return false;
+            }
+        } else if (field_is_op_seq(fd->kind)) {
+            size_t n = 0;
+            MLIR_OpHandle *children =
+                ASR_ModuleStorageGetFieldOpSeq(op, fd->name, &n);
+            for (size_t j = 0; j < n; ++j) {
+                if (!verify_var_refs_in_op(children[j], set, depth + 1)) {
+                    return false;
+                }
+            }
+        }
+    }
+    return true;
+}
+
+static bool verify_scope_symbols(MLIR_OpHandle scope_op) {
+    ASR_VerifySymSet syms = {};
+    MLIR_OpHandle symtab = asr_get_scope_region(scope_op, "symtab");
+    if (symtab == MLIR_INVALID_HANDLE) {
+        return true;
+    }
+    if (!verify_collect_symtab(symtab, &syms)) {
+        return false;
+    }
+    MLIR_OpHandle body = asr_get_scope_region(scope_op, "body");
+    if (body != MLIR_INVALID_HANDLE &&
+            !verify_var_refs_in_scope_region(body, &syms, 0)) {
+        return false;
+    }
+    return true;
+}
+
 bool ASR_DialectVerifyNative(MLIR_Context *ctx, MLIR_OpHandle module) {
     if (MLIR_GetOpType(module) != OP_TYPE_MODULE) {
         return false;
@@ -316,6 +465,12 @@ bool ASR_DialectVerifyNative(MLIR_Context *ctx, MLIR_OpHandle module) {
         if (!verify_op_tree(ctx, op, 0)) {
             return false;
         }
+        if (kind == ASR_DIALECT_OP_SYMBOL_PROGRAM ||
+                kind == ASR_DIALECT_OP_SYMBOL_FUNCTION) {
+            if (!verify_scope_symbols(op)) {
+                return false;
+            }
+        }
     }
     return true;
 }
@@ -323,10 +478,6 @@ bool ASR_DialectVerifyNative(MLIR_Context *ctx, MLIR_OpHandle module) {
 extern string ASR_DialectPrintPretty(MLIR_Context *ctx, MLIR_OpHandle module);
 
 string ASR_DialectPrintNative(MLIR_Context *ctx, MLIR_OpHandle module) {
-    const char *mode = getenv("LFORTRAN_ASR_DIALECT_DUMP");
-    if (mode && (strcmp(mode, "generic") == 0 || strcmp(mode, "debug") == 0)) {
-        return MLIR_PrintOperationGeneric(ctx, module);
-    }
     return ASR_DialectPrintPretty(ctx, module);
 }
 
