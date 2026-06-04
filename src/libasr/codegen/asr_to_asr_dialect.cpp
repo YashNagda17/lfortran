@@ -227,7 +227,36 @@ MLIR_OpHandle ASRToAsrDialectVisitor::create_scope_container(
         }
         ASR_ModuleStorageSetFieldOpSeq(container, "ops", buf, ops.size());
     }
+    MLIR_TypeHandle i64_ty = MLIR_CreateTypeInteger(&ctx, 64, false);
+    MLIR_AppendOpAttribute(&ctx, container, MLIR_CreateAttributeInteger(
+        &ctx, str_lit("asr.n_ops"), (int64_t)ops.size(), i64_ty));
     return container;
+}
+
+void ASRToAsrDialectVisitor::attach_variable_type_attrs(
+        MLIR_OpHandle var_op, const ASR::ttype_t &t) {
+    int64_t asr_kind = 4;
+    int64_t array_len = 0;
+    bool is_array = ASR::is_a<ASR::Array_t>(t);
+    ASR::ttype_t *elem = const_cast<ASR::ttype_t *>(&t);
+    if (is_array) {
+        array_len = ASRUtils::get_fixed_size_of_array(elem);
+        elem = ASRUtils::type_get_past_array(elem);
+    }
+    if (ASR::is_a<ASR::Integer_t>(*elem)) {
+        asr_kind = ASR::down_cast<ASR::Integer_t>(elem)->m_kind;
+    } else if (ASR::is_a<ASR::Real_t>(*elem)) {
+        asr_kind = ASR::down_cast<ASR::Real_t>(elem)->m_kind;
+    } else if (ASR::is_a<ASR::Logical_t>(*elem)) {
+        asr_kind = ASR::down_cast<ASR::Logical_t>(elem)->m_kind;
+    }
+    MLIR_TypeHandle i64_ty = MLIR_CreateTypeInteger(&ctx, 64, false);
+    MLIR_AppendOpAttribute(&ctx, var_op, MLIR_CreateAttributeInteger(
+        &ctx, str_lit("asr.type_kind"), asr_kind, i64_ty));
+    if (is_array && array_len > 0) {
+        MLIR_AppendOpAttribute(&ctx, var_op, MLIR_CreateAttributeInteger(
+            &ctx, str_lit("asr.array_len"), array_len, i64_ty));
+    }
 }
 
 void ASRToAsrDialectVisitor::attach_scope_regions(MLIR_OpHandle scope_op) {
@@ -386,7 +415,6 @@ void ASRToAsrDialectVisitor::visit_StringFormat(const ASR::StringFormat_t &x) {
     MLIR_LocationHandle op_loc = loc(x.base.base.loc);
     last_value = ASR_CreateStringFormatOp(&ctx, op_loc, fmt, args, x.n_args,
         (int64_t)x.m_kind, type, value);
-    ASR_ModuleStorageSetFieldOpSeq(last_value, "args", args, x.n_args);
 }
 
 void ASRToAsrDialectVisitor::visit_FileWrite(const ASR::FileWrite_t &x) {
@@ -443,7 +471,6 @@ void ASRToAsrDialectVisitor::visit_DoLoop(const ASR::DoLoop_t &x) {
     }
     last_value = ASR_CreateDoLoopOp(&ctx, default_loc(),
         asr_cstr(x.m_name), head, body_ptr, n_body, nullptr, 0);
-    ASR_ModuleStorageSetBody(last_value, body_ptr, n_body);
     append_current_stmt(last_value);
 }
 
@@ -472,6 +499,7 @@ void ASRToAsrDialectVisitor::visit_Variable(const ASR::Variable_t &v) {
         v.m_is_volatile, v.m_is_protected, (int64_t)v.m_pass_attr,
         v.m_self_argument ? asr_cstr(v.m_self_argument) : str_lit(""),
         nullptr, 0);
+    attach_variable_type_attrs(last_value, *v.m_type);
     append_scope_op(last_value);
 }
 
@@ -490,7 +518,6 @@ void ASRToAsrDialectVisitor::visit_ArrayConstructor(const ASR::ArrayConstructor_
     }
     last_value = ASR_CreateArrayConstructorOp(&ctx, default_loc(), args, n_args,
         type, value, storage_format, struct_var);
-    ASR_ModuleStorageSetFieldOpSeq(last_value, "args", args, n_args);
 }
 
 void ASRToAsrDialectVisitor::visit_ArrayItem(const ASR::ArrayItem_t &x) {
@@ -505,7 +532,38 @@ void ASRToAsrDialectVisitor::visit_ArrayItem(const ASR::ArrayItem_t &x) {
     }
     last_value = ASR_CreateArrayItemOp(&ctx, default_loc(), v, args, n_args,
         type, storage_format, value);
-    ASR_ModuleStorageSetFieldOpSeq(last_value, "args", args, n_args);
+}
+
+void ASRToAsrDialectVisitor::visit_ArrayConstant(const ASR::ArrayConstant_t &x) {
+    if (!asr_al) {
+        throw AsrDialectError("asr dialect: ASR allocator not set for ArrayConstant");
+    }
+    MLIR_TypeHandle type = convert_type(*x.m_type);
+    int64_t storage_format = (int64_t)x.m_storage_format;
+    MLIR_LocationHandle op_loc = loc(x.base.base.loc);
+    // m_n_data is packed byte size (see asr_verify visit_ArrayConstant), not element count.
+    size_t n_elems = ASRUtils::get_constant_ArrayConstant_size(
+        const_cast<ASR::ArrayConstant_t *>(&x));
+    std::vector<MLIR_OpHandle> elem_ops;
+    elem_ops.reserve(n_elems);
+    suppress_module_append = true;
+    for (size_t i = 0; i < n_elems; ++i) {
+        ASR::expr_t *elt = ASRUtils::fetch_ArrayConstant_value(*asr_al, x, (int)i);
+        MLIR_OpHandle elem = emit_expr(*elt);
+        if (elem != MLIR_INVALID_HANDLE) {
+            elem_ops.push_back(elem);
+        }
+    }
+    suppress_module_append = false;
+    MLIR_OpHandle *buf = nullptr;
+    size_t n = elem_ops.size();
+    if (n > 0) {
+        buf = (MLIR_OpHandle *)arena_alloc(arena, n * sizeof(MLIR_OpHandle));
+        for (size_t i = 0; i < n; ++i) {
+            buf[i] = elem_ops[i];
+        }
+    }
+    last_value = ASR_CreateArrayConstantOp(&ctx, op_loc, buf, n, type, storage_format);
 }
 
 // >>> GENERATED VISITOR IMPLEMENTATIONS >>>
@@ -531,15 +589,6 @@ void ASRToAsrDialectVisitor::visit_ArrayBroadcast(const ASR::ArrayBroadcast_t &x
         if (x.m_value) { value = emit_expr(*x.m_value); }
     MLIR_LocationHandle op_loc = loc(x.base.base.loc);
     last_value = ASR_CreateArrayBroadcastOp(&ctx, op_loc, array, shape, type, value);
-}
-
-void ASRToAsrDialectVisitor::visit_ArrayConstant(const ASR::ArrayConstant_t &x) {
-    int64_t n_data = x.m_n_data;
-    int64_t data = (int64_t)x.m_data;
-    MLIR_TypeHandle type = convert_type(*x.m_type);
-    int64_t storage_format = (int64_t)x.m_storage_format;
-    MLIR_LocationHandle op_loc = loc(x.base.base.loc);
-    last_value = ASR_CreateArrayConstantOp(&ctx, op_loc, n_data, data, type, storage_format);
 }
 
 void ASRToAsrDialectVisitor::visit_ArrayIsContiguous(const ASR::ArrayIsContiguous_t &x) {
@@ -2462,7 +2511,6 @@ void ASRToAsrDialectVisitor::visit_TranslationUnit(const ASR::TranslationUnit_t 
     MLIR_OpHandle items[1] = {program_op};
     last_value = ASR_CreateTranslationUnitOp(&ctx, default_loc(),
         MLIR_INVALID_HANDLE, items, 1);
-    ASR_ModuleStorageSetFieldOpSeq(last_value, "items", items, 1);
     append_module(last_value);
 }
 

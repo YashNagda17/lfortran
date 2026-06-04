@@ -51,7 +51,6 @@ Result<std::unique_ptr<MLIRModule>> asr_to_mlir_new(Allocator &al,
     ASR::asr_t &asr, diag::Diagnostics &diagnostics,
     MlirNewPipelineTarget target) {
     ensure_mlir_corec_platform_initialized();
-    (void)al;
     if (!ASR::is_a<ASR::unit_t>(asr)) {
         diagnostics.diagnostics.push_back(diag::Diagnostic(
             "asr_to_mlir_new: expected translation unit",
@@ -67,6 +66,7 @@ Result<std::unique_ptr<MLIRModule>> asr_to_mlir_new(Allocator &al,
     }
 
     ASRToAsrDialectVisitor emit;
+    emit.asr_al = &al;
     try {
         emit.visit_TranslationUnit(
             *ASR::down_cast<ASR::TranslationUnit_t>(u));
