@@ -1,7 +1,6 @@
 // Statement-first ASR dialect pretty printer (V1 structural storage).
 #include "asr_dialect_api.h"
-#include "asr_dialect_module_storage.h"
-#include "asr_dialect_fields.h"
+#include "asr_dialect_storage.h"
 
 #include <stdarg.h>
 #include <stdint.h>
@@ -27,6 +26,7 @@ typedef struct {
 } ASR_PpCtx;
 
 static void pp_expr(ASR_PpCtx *pp, MLIR_OpHandle op, char *buf, size_t bufsz);
+static bool pp_type_spelling(ASR_PpCtx *pp, MLIR_TypeHandle ty, char *buf, size_t bufsz);
 static void pp_format_index_op(ASR_PpCtx *pp, MLIR_OpHandle idx_op,
         char *buf, size_t bufsz);
 static void pp_format_array_item(ASR_PpCtx *pp, MLIR_OpHandle op,
@@ -86,6 +86,22 @@ static int64_t pp_parse_memref_static_len(ASR_PpCtx *pp, MLIR_TypeHandle ty) {
         return 0;
     }
     return n > 0 ? n : 0;
+}
+
+static bool pp_variable_type_spelling(ASR_PpCtx *pp, MLIR_OpHandle var_op,
+        char *buf, size_t bufsz) {
+    int64_t asr_kind = asr_get_type_kind_attr(var_op);
+    int64_t array_len = asr_get_array_len_attr(var_op);
+    if (asr_kind > 0 && array_len > 0) {
+        snprintf(buf, bufsz, "!asr.array<!asr.integer<%lld>, %lld>",
+            (long long)asr_kind, (long long)array_len);
+        return true;
+    }
+    if (asr_kind > 0) {
+        snprintf(buf, bufsz, "!asr.integer<%lld>", (long long)asr_kind);
+        return true;
+    }
+    return pp_type_spelling(pp, asr_get_field_type(var_op, "type"), buf, bufsz);
 }
 
 /* Returns true when a type suffix should be printed using !asr.* dialect types. */
@@ -181,57 +197,25 @@ static void pp_format_index_op(ASR_PpCtx *pp, MLIR_OpHandle idx_op,
     pp_format_simple_expr(pp, idx_op, buf, bufsz);
 }
 
-static bool pp_format_array_literal(ASR_PpCtx *pp, const int32_t *data,
-        int64_t n_data, char *buf, size_t bufsz) {
-    (void)pp;
-    if (!data || n_data <= 0) {
-        return false;
-    }
-    size_t pos = 0;
-    pos += (size_t)snprintf(buf + pos, bufsz - pos, "[");
-    int64_t limit = n_data > 64 ? 64 : n_data;
-    for (int64_t i = 0; i < limit; ++i) {
-        if (i > 0) {
-            pos += (size_t)snprintf(buf + pos, bufsz - pos, ", ");
-        }
-        pos += (size_t)snprintf(buf + pos, bufsz - pos, "%" PRId32, data[i]);
-        if (pos >= bufsz - 8) {
-            break;
-        }
-    }
-    if (n_data > limit) {
-        pos += (size_t)snprintf(buf + pos, bufsz - pos, ", ...");
-    }
-    snprintf(buf + pos, bufsz - pos, "]");
-    return true;
-}
-
 static bool pp_format_array_constant(ASR_PpCtx *pp, MLIR_OpHandle op,
         char *buf, size_t bufsz) {
     MLIR_OpHandle *elems = asr_get_field_op_seq(op, "elements");
     size_t n = asr_get_field_op_seq_count(op, "elements");
-    if (elems && n > 0) {
-        size_t pos = 0;
-        pos += (size_t)snprintf(buf + pos, bufsz - pos, "[");
-        for (size_t i = 0; i < n && pos < bufsz - 16; ++i) {
-            char ebuf[64];
-            if (i > 0) {
-                pos += (size_t)snprintf(buf + pos, bufsz - pos, ", ");
-            }
-            pp_expr(pp, elems[i], ebuf, sizeof(ebuf));
-            pos += (size_t)snprintf(buf + pos, bufsz - pos, "%s", ebuf);
-        }
-        snprintf(buf + pos, bufsz - pos, "]");
-        return true;
-    }
-
-    intptr_t data_ptr = (intptr_t)asr_get_field_i64(op, "data", 0);
-    int64_t arr_len = asr_get_array_len_attr(op);
-    if (data_ptr == 0 || arr_len <= 0) {
+    if (!elems || n == 0) {
         return false;
     }
-    return pp_format_array_literal(pp, (const int32_t *)(void *)data_ptr,
-        arr_len, buf, bufsz);
+    size_t pos = 0;
+    pos += (size_t)snprintf(buf + pos, bufsz - pos, "[");
+    for (size_t i = 0; i < n && pos < bufsz - 16; ++i) {
+        char ebuf[64];
+        if (i > 0) {
+            pos += (size_t)snprintf(buf + pos, bufsz - pos, ", ");
+        }
+        pp_expr(pp, elems[i], ebuf, sizeof(ebuf));
+        pos += (size_t)snprintf(buf + pos, bufsz - pos, "%s", ebuf);
+    }
+    snprintf(buf + pos, bufsz - pos, "]");
+    return true;
 }
 
 static bool pp_format_array_constructor(ASR_PpCtx *pp, MLIR_OpHandle op,
@@ -704,7 +688,9 @@ static void pp_stmt(ASR_PpCtx *pp, MLIR_OpHandle op) {
         string name = asr_get_field_str(op, "name");
         int64_t arr_len = asr_get_array_len_attr(op);
         pp_format_sym(name, buf, sizeof(buf));
-        if (pp_type_spelling(pp, asr_get_field_type(op, "type"), ty, sizeof(ty))) {
+        if (pp_variable_type_spelling(pp, op, ty, sizeof(ty))) {
+            pp_fmt(pp, "asr.variable %s : %s {", buf, ty);
+        } else if (pp_type_spelling(pp, asr_get_field_type(op, "type"), ty, sizeof(ty))) {
             pp_fmt(pp, "asr.variable %s : %s {", buf, ty);
         } else if (arr_len > 0) {
             pp_fmt(pp, "asr.variable %s : i32[%lld] {", buf, (long long)arr_len);
