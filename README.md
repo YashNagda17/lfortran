@@ -109,7 +109,7 @@ python src/libasr/asdl_to_asr_dialect.py --check \
 
 ### Generated headers (`src/mlir/generated/`)
 
-All four are produced by `asdl_to_asr_dialect.py` — **do not edit by hand**.
+All five are produced by `asdl_to_asr_dialect.py` — **do not edit by hand**.
 
 | File | Purpose |
 |------|---------|
@@ -117,6 +117,7 @@ All four are produced by `asdl_to_asr_dialect.py` — **do not edit by hand**.
 | **`asr_dialect_api_generated.h`** | Typed builders `ASR_CreateVariableOp(...)`, `ASR_CreateDoLoopOp(...)`, etc. — one per ASR constructor. The visitor calls these instead of assembling field arrays by hand. |
 | **`asr_dialect_lowering_dispatch.h`** | Header-only `ASR_DialectLowerOneOp()` switch: maps op kind → `ASR_Lower*()` handler (only ops in `LOWERED_OPS` have handlers today). |
 | **`asr_dialect_enum_print.h`** | Name tables for ASR simple enums (`intent`, `access`, `binop`, …) so pretty-print shows `"inout"` instead of `2`. |
+| **`asr_dialect_print_policy.h`** | Generated pretty-print elision rules and field→enum mappings (`asr_pp_variable_field_is_default`, `asr_pp_enum_field_name`, …). |
 
 The generator also updates marked sections in `asr_to_asr_dialect.h` / `.cpp` (visitor declarations and default `visit_*` bodies).
 
@@ -125,11 +126,9 @@ The generator also updates marked sections in `asr_to_asr_dialect.h` / `.cpp` (v
 | File | Role |
 |------|------|
 | [`asr_dialect_api.h`](src/mlir/lfortran/asr_dialect_api.h) | Public C API: `ASR_DialectCreateOp`, `ASR_DialectVerify`, `ASR_DialectLowerToHighMLIR`, `ASR_DialectPrint`. |
-| [`asr_dialect_api.c`](src/mlir/lfortran/asr_dialect_api.c) | Facade: schema lookup, delegates create/verify/print to native or upstream backend. |
+| [`asr_dialect_api.c`](src/mlir/lfortran/asr_dialect_api.c) | Facade: schema lookup; delegates create/verify/print to native (upstream ASR dialect deferred). |
 | [`asr_dialect_api_native.c`](src/mlir/lfortran/asr_dialect_api_native.c) | **Native op creation:** scalar fields → `asr.*` MLIR attributes; child op refs → module side storage. Verification walks the schema. |
-| [`asr_dialect_api_upstream.cpp`](src/mlir/lfortran/asr_dialect_api_upstream.cpp) | Optional upstream-MLIR-backed dialect path (for future parity / testing). |
-| [`asr_dialect_module_storage.c`](src/mlir/lfortran/asr_dialect_module_storage.c) / [`.h`](src/mlir/lfortran/asr_dialect_module_storage.h) | Context-owned side table for child op pointers, statement bodies, op sequences, and type metadata — **not** stored as integer pointer attributes on ops. |
-| [`asr_dialect_fields.h`](src/mlir/lfortran/asr_dialect_fields.h) | Read helpers: `asr_get_field_str`, `asr_get_field_op`, `asr_get_field_op_seq`, etc. |
+| [`asr_dialect_storage.c`](src/mlir/lfortran/asr_dialect_storage.c) / [`.h`](src/mlir/lfortran/asr_dialect_storage.h) | **Internal:** side tables + `asr_get_field_*` readers (not public API; use `asr_dialect_api.h` externally). |
 | [`asr_dialect_pretty_print.c`](src/mlir/lfortran/asr_dialect_pretty_print.c) | Textual dump of `asr.*` IR (`ASR_DialectPrint`); uses schema + enum_print for readable output. |
 | [`asr_dialect_lowering_handlers.c`](src/mlir/lfortran/asr_dialect_lowering_handlers.c) | Semantic lowering: ASR dialect ops → high-level MLIR (`memref.alloca`, `arith.addi`, `cf.br`, …). Hand-written per op family; dispatch is generated. |
 
@@ -171,7 +170,7 @@ ASR already has a formal schema in ASDL. The generator keeps **~246 op definitio
 
 ### Why module side storage for child ops and bodies?
 
-Child expressions, statement bodies, and op sequences are stored in **`ASR_ModuleStorage*`** (context-owned tables), not as pointer-shaped integer attributes on MLIR ops. That keeps default MLIR dumps stable, avoids fake pointer attrs, and gives verify/print/lowering a single place to resolve `"value"`, `"body"`, `"args"`, etc.
+Child expressions, statement bodies, and op sequences are stored in **`asr_dialect_storage`** (context-owned tables), not as pointer-shaped integer attributes on MLIR ops. That keeps default MLIR dumps stable, avoids fake pointer attrs, and gives verify/print/lowering a single place to resolve `"value"`, `"body"`, `"args"`, etc.
 
 Scalar metadata (`intent`, `name`, `type`, …) still lives as normal **`asr.<field>`** attributes on each op.
 
@@ -286,6 +285,8 @@ Show flags imply the mlir-new pipeline even if `--backend` defaults to `llvm`. U
 
 **Note:** `--show-llvm` uses the **classic LLVM backend** (`asr_to_llvm`), not the mlir-new translation path.
 
+`--show-mlir-asr-dialect` uses the statement-first pretty printer: each `asr.variable` in `asr.symtab` prints its declaration fields in a `{ ... }` block (intent, storage, ABI, optional init exprs, etc.), plus `asr.body` statements.
+
 ---
 
 ## Lowering coverage (incremental)
@@ -335,7 +336,7 @@ Branch **`mlir6`**. Use `git log` or `clarity show -c HEAD~13..HEAD` to inspect.
 
 **Generator:** `src/libasr/asdl_to_asr_dialect.py`
 
-**Generated (review/check in):** `src/mlir/generated/asr_dialect_{schema,api_generated,lowering_dispatch,enum_print}.h`
+**Generated (review/check in):** `src/mlir/generated/asr_dialect_{schema,api_generated,lowering_dispatch,enum_print,print_policy}.h`
 
 **Visitor:** `src/libasr/codegen/asr_to_asr_dialect.{h,cpp}`
 
