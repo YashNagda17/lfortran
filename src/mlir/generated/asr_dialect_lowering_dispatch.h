@@ -4,6 +4,8 @@
 
 #include "asr_dialect_api.h"
 
+/* Lowering handlers exist only for COMPILE_SUPPORTED_OPS (see asdl_to_asr_dialect.py). */
+
 extern bool ASR_LowerArrayBound(ASR_LoweringContext *lc, MLIR_OpHandle op);
 extern bool ASR_LowerArrayConstant(ASR_LoweringContext *lc, MLIR_OpHandle op);
 extern bool ASR_LowerArrayConstructor(ASR_LoweringContext *lc, MLIR_OpHandle op);

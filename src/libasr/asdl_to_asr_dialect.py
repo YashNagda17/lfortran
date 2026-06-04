@@ -7,6 +7,7 @@ Outputs:
   - asr_dialect_api_generated.h
   - asr_dialect_lowering_dispatch.h
   - asr_dialect_enum_print.h
+  - asr_dialect_print_policy.h
   - asr_to_asr_dialect.h (generated declarations section)
   - asr_to_asr_dialect.cpp (generated implementations section)
 """
@@ -39,9 +40,8 @@ PRODUCT_OP_CATEGORIES = {
     "case_stmt", "type_stmt", "rank_stmt", "require_instantiation", "omp_clause",
 }
 
-# Focused families with implementation needed for lowering.
-# These operations can be converted from ASR Dialect to High Level MLIR.
-LOWERED_OPS = {
+# Ops with ASR-dialect -> high-level MLIR lowering handlers (compile path).
+COMPILE_SUPPORTED_OPS = {
     # Arithmetic
     "IntegerConstant", "IntegerBinOp", "IntegerCompare", "IntegerUnaryMinus",
     "IntegerBitNot", "RealConstant", "RealBinOp", "RealCompare", "RealUnaryMinus",
@@ -60,9 +60,44 @@ LOWERED_OPS = {
     "Integer", "Real", "Logical", "Complex", "Array",
 }
 
+# Back-compat alias (prefer COMPILE_SUPPORTED_OPS in new code).
+LOWERED_OPS = COMPILE_SUPPORTED_OPS
+
 # Fields omitted from dialect op storage (handled by emitter policy).
 # symbol_table is materialized as asr.symtab/asr.body regions in the visitor.
 SKIP_FIELDS = {"location"}
+
+# Compact pretty-print elision for asr.symbol.variable (field name -> rule tag).
+VARIABLE_FIELD_ELIDE = {
+    "name": "always",
+    "intent": "i64_zero",
+    "storage": "i64_zero",
+    "abi": "i64_zero",
+    "access": "i64_zero",
+    "presence": "i64_zero",
+    "pass_attr": "i64_zero",
+    "value_attr": "bool_false",
+    "target_attr": "bool_false",
+    "contiguous_attr": "bool_false",
+    "is_volatile": "bool_false",
+    "is_protected": "bool_false",
+    "bindc_name": "str_empty",
+    "self_argument": "str_empty",
+}
+
+PP_ELIDE_C_ENUM = {
+    "always": "ASR_PP_ELIDE_ALWAYS",
+    "i64_zero": "ASR_PP_ELIDE_I64_ZERO",
+    "bool_false": "ASR_PP_ELIDE_BOOL_FALSE",
+    "str_empty": "ASR_PP_ELIDE_STR_EMPTY",
+}
+
+
+def enum_pp_attr_category(asdl_type: str) -> str:
+    """MLIR attribute dialect prefix for #asr.<category><kw>."""
+    if asdl_type == "storage_type":
+        return "storage"
+    return snake_case(asdl_type)
 
 
 CPP_KEYWORDS = {
@@ -132,6 +167,15 @@ def field_kind(asdl_type: str, seq: bool, opt: bool) -> str:
         return f"ASR_FIELD_{base}_OPT"
     return f"ASR_FIELD_{base}"
 
+OP_HANDLE_SEQ_FIELD_KINDS = {
+    "ASR_FIELD_OP_SEQ",
+    "ASR_FIELD_NODE_SEQ",
+    "ASR_FIELD_EXPR_SEQ",
+    "ASR_FIELD_STMT_SEQ",
+    "ASR_FIELD_SYMBOL_SEQ",
+}
+
+
 # Assign a ASR Value inside a Node to ASR Dialect Field structure.
 def gen_field_assign(i: int, f: asdl.Field, param: str) -> list[str]:
     fname = f.name or f.type
@@ -150,15 +194,27 @@ def gen_field_assign(i: int, f: asdl.Field, param: str) -> list[str]:
         lines.append(f"    fields[{i}].value.i64 = {param};")
     elif f.type == "ttype":
         lines.append(f"    fields[{i}].value.type = {param};")
-    elif f.seq and fk in ("ASR_FIELD_OP_SEQ", "ASR_FIELD_NODE_SEQ",
-        "ASR_FIELD_EXPR_SEQ", "ASR_FIELD_STMT_SEQ"):
-        lines.append(f"    fields[{i}].value.op = (MLIR_OpHandle)(uintptr_t){param};")
+    elif f.seq and fk in OP_HANDLE_SEQ_FIELD_KINDS:
+        lines.append(f"    fields[{i}].value.op_seq.items = {param};")
+        lines.append(f"    fields[{i}].value.op_seq.n_items = n_{param};")
     else:
         lines.append(f"    fields[{i}].value.op = {param};")
     return lines
 
 
 # Create a list of operations from the ASDL module.
+def stored_dialect_fields(op: dict) -> list:
+    """Fields stored on ASR dialect ops (may differ from ASR.asdl for mlir-new)."""
+    if op["name"] == "ArrayConstant":
+        # Do not store raw ASR heap pointers in dialect IR; use element expr ops.
+        return [
+            asdl.Field("expr", "elements", seq=True),
+            asdl.Field("ttype", "type"),
+            asdl.Field("arraystorage", "storage_format"),
+        ]
+    return [f for f in op["fields"] if f.name not in SKIP_FIELDS]
+
+
 def collect_ops(mod: asdl.Module) -> list[dict]:
     ops = []
     # Ignore simple no-operation enum types, like intent.
@@ -263,7 +319,7 @@ def gen_schema_h(ops: list[dict]) -> str:
         "",
     ])
     for op in ops:
-        stored = [f for f in op["fields"] if f.name not in SKIP_FIELDS]
+        stored = stored_dialect_fields(op)
         if not stored:
             continue
         lines.append(f"static const ASR_DialectFieldDesc {op['kind']}_FIELDS[] = {{")
@@ -277,7 +333,7 @@ def gen_schema_h(ops: list[dict]) -> str:
 
     lines.append("static const ASR_DialectOpSchema ASR_DIALECT_SCHEMA[] = {")
     for op in ops:
-        stored = [f for f in op["fields"] if f.name not in SKIP_FIELDS]
+        stored = stored_dialect_fields(op)
         cat = cat_map.get(op["category"], "ASR_DIALECT_CATEGORY_PRODUCT")
         fields_ref = f"{op['kind']}_FIELDS" if stored else "NULL"
         lines.append("    {")
@@ -307,7 +363,7 @@ def gen_api_generated_h(ops: list[dict]) -> str:
         "",
     )
     for op in ops:
-        stored = [f for f in op["fields"] if f.name not in SKIP_FIELDS]
+        stored = stored_dialect_fields(op)
         params = ["MLIR_Context *ctx", "MLIR_LocationHandle loc"]
         for f in stored:
             fname = c_param_name(f.name or f.type)
@@ -317,7 +373,7 @@ def gen_api_generated_h(ops: list[dict]) -> str:
             elif f.type in ("expr", "stmt", "node"):
                 params.append(f"MLIR_OpHandle {fname}")
             elif f.type == "symbol":
-                params.append(f"string {fname}")
+                params.append(f"ASR_SymbolRef {fname}")
             elif f.type == "ttype":
                 params.append(f"MLIR_TypeHandle {fname}")
             elif f.type in ("identifier", "string"):
@@ -458,7 +514,7 @@ VISITOR_IMPL_END = "// <<< END GENERATED VISITOR IMPLEMENTATIONS <<<"
 
 SKIP_VISITOR_OPS = {
     "Program", "TranslationUnit", "DoLoop", "Print", "FileWrite", "Variable",
-    "StringFormat", "ArrayConstructor", "ArrayItem",
+    "StringFormat", "ArrayConstructor", "ArrayItem", "ArrayConstant",
 }
 
 # Embedded ASR products emitted by helpers in asr_to_asr_dialect.cpp.
@@ -591,9 +647,11 @@ def gen_lowering_dispatch_h(ops: list[dict]) -> str:
         "",
         "#include \"asr_dialect_api.h\"",
         "",
+        "/* Lowering handlers exist only for COMPILE_SUPPORTED_OPS (see asdl_to_asr_dialect.py). */",
+        "",
     )
     for op in ops:
-        if op["name"] in LOWERED_OPS:
+        if op["name"] in COMPILE_SUPPORTED_OPS:
             handler = f"ASR_Lower{op['name']}"
             lines.append(
                 f"extern bool {handler}(ASR_LoweringContext *lc, MLIR_OpHandle op);")
@@ -605,7 +663,7 @@ def gen_lowering_dispatch_h(ops: list[dict]) -> str:
         "    switch (kind) {",
     ])
     for op in ops:
-        if op["name"] in LOWERED_OPS:
+        if op["name"] in COMPILE_SUPPORTED_OPS:
             handler = f"ASR_Lower{op['name']}"
             lines.append(f"    case {op['kind']}:")
             lines.append(f"        return {handler}(ctx, op);")
@@ -654,6 +712,151 @@ def gen_enum_print_h(enums: dict[str, list[str]]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def collect_variable_enum_pp_fields(variable_op: dict | None) -> list[tuple[str, str]]:
+    """(field name, ASDL enum type) for Variable I64 fields backed by simple sums."""
+    if not variable_op:
+        return []
+    out: list[tuple[str, str]] = []
+    for f in variable_op["fields"]:
+        if not f.name or f.name in SKIP_FIELDS:
+            continue
+        if f.seq:
+            continue
+        if f.type in SIMPLE_SUM_NAMES:
+            out.append((f.name, f.type))
+    return sorted(out)
+
+
+def gen_print_policy_h(ops: list[dict]) -> str:
+    """Pretty-print elision and field-to-enum metadata for the hybrid ASR dump."""
+    variable = next((o for o in ops if o["name"] == "Variable"), None)
+    lines = generated_file_lines(
+        "#pragma once",
+        "",
+        "#include \"generated/asr_dialect_schema.h\"",
+        "#include \"generated/asr_dialect_enum_print.h\"",
+        "#include \"asr_dialect_storage.h\"",
+        "",
+        "#include <string.h>",
+        "",
+        "typedef enum {",
+        "    ASR_PP_ELIDE_NEVER = 0,",
+        "    ASR_PP_ELIDE_ALWAYS,",
+        "    ASR_PP_ELIDE_I64_ZERO,",
+        "    ASR_PP_ELIDE_BOOL_FALSE,",
+        "    ASR_PP_ELIDE_STR_EMPTY,",
+        "} ASR_PpElideKind;",
+        "",
+        "typedef struct {",
+        "    const char *field;",
+        "    ASR_PpElideKind kind;",
+        "} ASR_PpVariableElideRule;",
+        "",
+    )
+    if variable:
+        lines.append("static const ASR_PpVariableElideRule ASR_PP_VARIABLE_ELIDE[] = {")
+        for f in variable["fields"]:
+            fname = f.name or f.type
+            rule = VARIABLE_FIELD_ELIDE.get(fname)
+            if not rule:
+                continue
+            c_kind = PP_ELIDE_C_ENUM[rule]
+            lines.append(f'    {{"{fname}", {c_kind}}},')
+        lines.extend([
+            "};",
+            "static const size_t ASR_PP_VARIABLE_ELIDE_COUNT =",
+            "    sizeof(ASR_PP_VARIABLE_ELIDE) / sizeof(ASR_PP_VARIABLE_ELIDE[0]);",
+            "",
+        ])
+    else:
+        lines.extend([
+            "static const ASR_PpVariableElideRule ASR_PP_VARIABLE_ELIDE[] = {};",
+            "static const size_t ASR_PP_VARIABLE_ELIDE_COUNT = 0;",
+            "",
+        ])
+
+    enum_fields = collect_variable_enum_pp_fields(variable)
+    lines.extend([
+        "typedef const char *(*ASR_PpEnumNameFn)(int64_t);",
+        "",
+        "typedef struct {",
+        "    const char *field;",
+        "    const char *attr_category;",
+        "    ASR_PpEnumNameFn name_fn;",
+        "} ASR_PpEnumFieldDesc;",
+        "",
+        "static const ASR_PpEnumFieldDesc ASR_PP_ENUM_FIELDS[] = {",
+    ])
+    for fname, asdl_type in enum_fields:
+        fn = f"asr_enum_{snake_case(asdl_type)}_name"
+        cat = enum_pp_attr_category(asdl_type)
+        lines.append(f'    {{"{fname}", "{cat}", {fn}}},')
+    lines.extend([
+        "};",
+        "static const size_t ASR_PP_ENUM_FIELDS_COUNT =",
+        "    sizeof(ASR_PP_ENUM_FIELDS) / sizeof(ASR_PP_ENUM_FIELDS[0]);",
+        "",
+        "static inline const ASR_PpEnumFieldDesc *asr_pp_lookup_enum_field(",
+        "        const char *field) {",
+        "    if (!field) {",
+        "        return NULL;",
+        "    }",
+        "    for (size_t i = 0; i < ASR_PP_ENUM_FIELDS_COUNT; ++i) {",
+        "        if (strcmp(field, ASR_PP_ENUM_FIELDS[i].field) == 0) {",
+        "            return &ASR_PP_ENUM_FIELDS[i];",
+        "        }",
+        "    }",
+        "    return NULL;",
+        "}",
+        "",
+        "static inline bool asr_pp_apply_elide_rule(",
+        "        ASR_PpElideKind kind, MLIR_OpHandle op, const char *field) {",
+        "    switch (kind) {",
+        "    case ASR_PP_ELIDE_ALWAYS:",
+        "        return true;",
+        "    case ASR_PP_ELIDE_I64_ZERO:",
+        "        return asr_get_field_i64(op, field, 0) == 0;",
+        "    case ASR_PP_ELIDE_BOOL_FALSE:",
+        "        return !asr_get_field_bool(op, field, false);",
+        "    case ASR_PP_ELIDE_STR_EMPTY:",
+        "        return asr_get_field_str(op, field).size == 0;",
+        "    default:",
+        "        return false;",
+        "    }",
+        "}",
+        "",
+        "static inline bool asr_pp_variable_field_is_default(",
+        "        const char *field, MLIR_OpHandle op) {",
+        "    for (size_t i = 0; i < ASR_PP_VARIABLE_ELIDE_COUNT; ++i) {",
+        "        if (strcmp(field, ASR_PP_VARIABLE_ELIDE[i].field) == 0) {",
+        "            return asr_pp_apply_elide_rule(",
+        "                ASR_PP_VARIABLE_ELIDE[i].kind, op, field);",
+        "        }",
+        "    }",
+        "    return false;",
+        "}",
+        "",
+        "static inline const char *asr_pp_enum_field_name(",
+        "        const char *field, int64_t v) {",
+        "    const ASR_PpEnumFieldDesc *desc = asr_pp_lookup_enum_field(field);",
+        "    if (!desc || !desc->name_fn) {",
+        "        return NULL;",
+        "    }",
+        "    return desc->name_fn(v);",
+        "}",
+        "",
+        "static inline const char *asr_pp_enum_attr_category(const char *field) {",
+        "    const ASR_PpEnumFieldDesc *desc = asr_pp_lookup_enum_field(field);",
+        "    if (desc && desc->attr_category) {",
+        "        return desc->attr_category;",
+        "    }",
+        "    return field;",
+        "}",
+        "",
+    ])
+    return "\n".join(lines)
+
+
 def write_outputs(
     ops: list[dict],
     enums: dict[str, list[str]],
@@ -667,6 +870,7 @@ def write_outputs(
         out_mlir_dir / "asr_dialect_api_generated.h": gen_api_generated_h(ops),
         out_mlir_dir / "asr_dialect_lowering_dispatch.h": gen_lowering_dispatch_h(ops),
         out_mlir_dir / "asr_dialect_enum_print.h": gen_enum_print_h(enums),
+        out_mlir_dir / "asr_dialect_print_policy.h": gen_print_policy_h(ops),
     }
     for path, content in outputs.items():
         path.write_text(content, encoding="utf-8")
@@ -685,6 +889,7 @@ def check_outputs(
         out_mlir_dir / "asr_dialect_api_generated.h": gen_api_generated_h(ops),
         out_mlir_dir / "asr_dialect_lowering_dispatch.h": gen_lowering_dispatch_h(ops),
         out_mlir_dir / "asr_dialect_enum_print.h": gen_enum_print_h(enums),
+        out_mlir_dir / "asr_dialect_print_policy.h": gen_print_policy_h(ops),
     }
     ok = True
     for path, content in expected.items():

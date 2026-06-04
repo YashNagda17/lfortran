@@ -371,8 +371,7 @@ static const ASR_DialectFieldDesc ASR_DIALECT_OP_EXPR_ARRAYBROADCAST_FIELDS[] = 
 };
 
 static const ASR_DialectFieldDesc ASR_DIALECT_OP_EXPR_ARRAYCONSTANT_FIELDS[] = {
-    {"n_data", ASR_FIELD_I64, ASR_FIELD_REQUIRED},
-    {"data", ASR_FIELD_VOID, ASR_FIELD_REQUIRED},
+    {"elements", ASR_FIELD_EXPR_SEQ, ASR_FIELD_REQUIRED},
     {"type", ASR_FIELD_TTYPE, ASR_FIELD_REQUIRED},
     {"storage_format", ASR_FIELD_I64, ASR_FIELD_REQUIRED},
 };
@@ -2034,7 +2033,7 @@ static const ASR_DialectOpSchema ASR_DIALECT_SCHEMA[] = {
         .category = ASR_DIALECT_CATEGORY_EXPR,
         .asr_name = "ArrayConstant",
         .mlir_name = "asr.array_constant",
-        .n_fields = 4,
+        .n_fields = 3,
         .fields = ASR_DIALECT_OP_EXPR_ARRAYCONSTANT_FIELDS,
     },
     {
