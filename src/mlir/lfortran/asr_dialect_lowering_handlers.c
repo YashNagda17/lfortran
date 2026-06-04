@@ -1,7 +1,6 @@
 // Semantic lowering: ASR dialect ops -> func/memref/arith high-level MLIR (V1).
 #include "asr_dialect_api.h"
-#include "asr_dialect_module_storage.h"
-#include "asr_dialect_fields.h"
+#include "asr_dialect_storage.h"
 #include "generated/asr_dialect_lowering_dispatch.h"
 
 #include <stdint.h>
@@ -9,34 +8,6 @@
 #include <string.h>
 #include <base/string.h>
 
-struct ASR_LoweringContext {
-    MLIR_Context *ctx;
-    MLIR_LocationHandle loc;
-    MLIR_OpHandle module;
-    MLIR_BlockHandle module_block;
-    MLIR_RegionHandle fn_region;
-    MLIR_BlockHandle cur_block;
-    MLIR_TypeHandle i32_ty;
-    MLIR_TypeHandle i64_ty;
-    MLIR_TypeHandle i1_ty;
-    MLIR_TypeHandle index_ty;
-    MLIR_TypeHandle memref_i32_1_ty;
-    int ssa_counter;
-    bool block_terminated;
-    const ASR_DialectOptions *options;
-};
-
-#define MAX_SYMS 256
-typedef struct {
-    string name;
-    MLIR_ValueHandle memref;
-    MLIR_TypeHandle memref_ty;
-    bool is_array;
-    int64_t array_len;
-} ASR_SymSlot;
-
-static ASR_SymSlot sym_slots[MAX_SYMS];
-static size_t n_sym_slots = 0;
 
 static string arena_ssa(ASR_LoweringContext *lc) {
     char *buf = (char *)arena_alloc(lc->ctx->arena, 32);
@@ -48,10 +19,10 @@ static string arena_ssa(ASR_LoweringContext *lc) {
 #define get_bool asr_get_field_bool
 #define get_str asr_get_field_str
 
-static ASR_SymSlot *lookup_sym(string name) {
-    for (size_t i = 0; i < n_sym_slots; ++i) {
-        if (str_eq(sym_slots[i].name, name)) {
-            return &sym_slots[i];
+static ASR_SymSlot *lookup_sym(ASR_LoweringContext *lc, string name) {
+    for (size_t i = 0; i < lc->n_sym_slots; ++i) {
+        if (str_eq(lc->sym_slots[i].name, name)) {
+            return &lc->sym_slots[i];
         }
     }
     return NULL;
@@ -114,6 +85,8 @@ static MLIR_TypeHandle memref_ty(ASR_LoweringContext *lc, int64_t len) {
 
 static MLIR_ValueHandle lower_expr_value(ASR_LoweringContext *lc, MLIR_OpHandle op);
 static MLIR_ValueHandle lower_expr_i1(ASR_LoweringContext *lc, MLIR_OpHandle op);
+static bool lower_expr_op(ASR_LoweringContext *lc, MLIR_OpHandle op);
+static bool lower_expr_i1_op(ASR_LoweringContext *lc, MLIR_OpHandle op);
 static bool lower_stmt_ref(ASR_LoweringContext *lc, MLIR_OpHandle stmt_op);
 static MLIR_ValueHandle emit_binop_i32(ASR_LoweringContext *lc, MLIR_OpType ty,
         string nm, MLIR_ValueHandle a, MLIR_ValueHandle b);
@@ -176,27 +149,6 @@ static int64_t icmp_predicate_for(int64_t cmpop) {
         case 5: return 5; /* GtE */
         default: return -1;
     }
-}
-
-static MLIR_ValueHandle emit_memref_load_scalar(ASR_LoweringContext *lc,
-        ASR_SymSlot *slot) {
-    MLIR_ValueHandle idx = emit_const_index(lc, 0);
-    MLIR_ValueHandle res = MLIR_CreateValueOpResult(lc->ctx, MLIR_INVALID_HANDLE,
-        0, lc->i32_ty, arena_ssa(lc), lc->loc);
-    MLIR_TypeHandle rts[1] = {lc->i32_ty};
-    MLIR_ValueHandle rs[1] = {res};
-    MLIR_ValueHandle ops[2] = {slot->memref, idx};
-    append_current(lc, emit_op(lc, OP_TYPE_MEMREF_LOAD, str_lit("memref.load"),
-        NULL, 0, rts, 1, rs, 1, ops, 2));
-    return res;
-}
-
-static void emit_memref_store_scalar(ASR_LoweringContext *lc, MLIR_ValueHandle val,
-        ASR_SymSlot *slot) {
-    MLIR_ValueHandle idx = emit_const_index(lc, 0);
-    MLIR_ValueHandle ops[3] = {val, slot->memref, idx};
-    append_current(lc, emit_op(lc, OP_TYPE_MEMREF_STORE, str_lit("memref.store"),
-        NULL, 0, NULL, 0, NULL, 0, ops, 3));
 }
 
 static MLIR_ValueHandle emit_index_cast(ASR_LoweringContext *lc, MLIR_ValueHandle v) {
@@ -277,57 +229,12 @@ static bool lower_stmt_ref(ASR_LoweringContext *lc, MLIR_OpHandle stmt_op) {
     return ASR_DialectLowerOneOp(lc, stmt_op);
 }
 
-bool ASR_LowerIntegerConstant(ASR_LoweringContext *lc, MLIR_OpHandle op) {
-    int64_t n = get_i64(op, "n", 0);
-    MLIR_ValueHandle v = emit_const_i32(lc, n);
-    if (MLIR_GetOpNumResults(op) > 0) {
-        (void)v;
-    }
-    return true;
-}
-
-bool ASR_LowerVar(ASR_LoweringContext *lc, MLIR_OpHandle op) {
-    string sym = get_str(op, "v");
-    ASR_SymSlot *slot = lookup_sym(sym);
-    if (!slot) {
-        return ASR_LowerUnsupported(lc, op, "Var: unknown symbol");
-    }
-    if (slot->is_array) {
-        return ASR_LowerUnsupported(lc, op, "Var: use array_item for array elements");
-    }
-    (void)emit_memref_load_scalar(lc, slot);
-    return true;
-}
-
-bool ASR_LowerIntegerBinOp(ASR_LoweringContext *lc, MLIR_OpHandle op) {
-    MLIR_ValueHandle lhs = lower_expr_value(lc, get_op_ref(op, "left"));
-    MLIR_ValueHandle rhs = lower_expr_value(lc, get_op_ref(op, "right"));
-    int64_t bop = get_i64(op, "op", 0);
-    MLIR_OpType ty = OP_TYPE_ARITH_ADDI;
-    string nm = str_lit("arith.addi");
-    switch (bop) {
-        case 0: ty = OP_TYPE_ARITH_ADDI; nm = str_lit("arith.addi"); break;
-        case 1: ty = OP_TYPE_ARITH_SUBI; nm = str_lit("arith.subi"); break;
-        case 2: ty = OP_TYPE_ARITH_MULI; nm = str_lit("arith.muli"); break;
-        case 3: ty = OP_TYPE_ARITH_DIVSI; nm = str_lit("arith.divsi"); break;
-        default: return ASR_LowerUnsupported(lc, op, "IntegerBinOp: unsupported binop");
-    }
-    MLIR_ValueHandle res = MLIR_CreateValueOpResult(lc->ctx, MLIR_INVALID_HANDLE,
-        0, lc->i32_ty, arena_ssa(lc), lc->loc);
-    MLIR_TypeHandle rts[1] = {lc->i32_ty};
-    MLIR_ValueHandle rs[1] = {res};
-    MLIR_ValueHandle ops[2] = {lhs, rhs};
-    append_current(lc, emit_op(lc, ty, nm, NULL, 0, rts, 1, rs, 1, ops, 2));
-    (void)res;
-    return true;
-}
-
 bool ASR_LowerVariable(ASR_LoweringContext *lc, MLIR_OpHandle op) {
     string name = get_str(op, "name");
-    if (n_sym_slots >= MAX_SYMS) {
+    if (lc->n_sym_slots >= ASR_MAX_SYMS) {
         return false;
     }
-    ASR_SymSlot *slot = &sym_slots[n_sym_slots++];
+    ASR_SymSlot *slot = &lc->sym_slots[lc->n_sym_slots++];
     slot->name = name;
     slot->is_array = false;
     slot->array_len = 0;
@@ -350,7 +257,7 @@ static MLIR_ValueHandle lower_array_item_value(ASR_LoweringContext *lc,
         return MLIR_INVALID_HANDLE;
     }
     string sym = get_str(base, "v");
-    ASR_SymSlot *slot = lookup_sym(sym);
+    ASR_SymSlot *slot = lookup_sym(lc, sym);
     if (!slot || !slot->is_array) {
         return MLIR_INVALID_HANDLE;
     }
@@ -375,7 +282,7 @@ static bool store_array_item(ASR_LoweringContext *lc, MLIR_OpHandle item_op,
     if (ASR_DialectGetOpKind(base) != ASR_DIALECT_OP_EXPR_VAR) {
         return false;
     }
-    ASR_SymSlot *slot = lookup_sym(get_str(base, "v"));
+    ASR_SymSlot *slot = lookup_sym(lc, get_str(base, "v"));
     if (!slot || !slot->is_array) {
         return false;
     }
@@ -422,33 +329,19 @@ static bool store_array_constant(ASR_LoweringContext *lc, ASR_SymSlot *slot,
         MLIR_OpHandle const_op) {
     MLIR_OpHandle *elems = asr_get_field_op_seq(const_op, "elements");
     size_t n = asr_get_field_op_seq_count(const_op, "elements");
-    if (elems && n > 0) {
-        size_t limit = n;
-        if ((size_t)slot->array_len > 0 && limit > (size_t)slot->array_len) {
-            limit = (size_t)slot->array_len;
+    if (!elems || n == 0) {
+        return ASR_LowerUnsupported(lc, const_op,
+            "ArrayConstant: missing elements in dialect IR");
+    }
+    size_t limit = n;
+    if ((size_t)slot->array_len > 0 && limit > (size_t)slot->array_len) {
+        limit = (size_t)slot->array_len;
+    }
+    for (size_t i = 0; i < limit; ++i) {
+        MLIR_ValueHandle val = lower_expr_value(lc, elems[i]);
+        if (val == MLIR_INVALID_HANDLE) {
+            return false;
         }
-        for (size_t i = 0; i < limit; ++i) {
-            MLIR_ValueHandle val = lower_expr_value(lc, elems[i]);
-            if (val == MLIR_INVALID_HANDLE) {
-                return false;
-            }
-            emit_memref_store_at(lc, val, slot, emit_const_index(lc, (int64_t)i));
-        }
-        return true;
-    }
-
-    intptr_t data_ptr = (intptr_t)get_i64(const_op, "data", 0);
-    int64_t arr_len = asr_get_array_len_attr(const_op);
-    if (data_ptr == 0 || arr_len <= 0) {
-        return false;
-    }
-    int32_t *data = (int32_t *)(void *)data_ptr;
-    size_t n_elems = (size_t)arr_len;
-    if (n_elems > (size_t)slot->array_len) {
-        n_elems = (size_t)slot->array_len;
-    }
-    for (size_t i = 0; i < n_elems; ++i) {
-        MLIR_ValueHandle val = emit_const_i32(lc, (int64_t)data[i]);
         emit_memref_store_at(lc, val, slot, emit_const_index(lc, (int64_t)i));
     }
     return true;
@@ -474,7 +367,7 @@ bool ASR_LowerAssignment(ASR_LoweringContext *lc, MLIR_OpHandle op) {
 
     if (tk == ASR_DIALECT_OP_EXPR_VAR) {
         string sym = get_str(target, "v");
-        ASR_SymSlot *slot = lookup_sym(sym);
+        ASR_SymSlot *slot = lookup_sym(lc, sym);
         if (!slot) {
             return false;
         }
@@ -492,7 +385,7 @@ bool ASR_LowerAssignment(ASR_LoweringContext *lc, MLIR_OpHandle op) {
         if (val == MLIR_INVALID_HANDLE) {
             return false;
         }
-        emit_memref_store_scalar(lc, val, slot);
+        emit_memref_store_at(lc, val, slot, emit_const_index(lc, 0));
         return true;
     }
     if (tk == ASR_DIALECT_OP_EXPR_ARRAYITEM) {
@@ -542,12 +435,6 @@ bool ASR_LowerPrint(ASR_LoweringContext *lc, MLIR_OpHandle op) {
 
 bool ASR_LowerFileWrite(ASR_LoweringContext *lc, MLIR_OpHandle op) {
     return lower_print_expr(lc, get_op_ref(op, "values"));
-}
-
-bool ASR_LowerStringFormat(ASR_LoweringContext *lc, MLIR_OpHandle op) {
-    (void)lc;
-    (void)op;
-    return true;
 }
 
 bool ASR_LowerReturn(ASR_LoweringContext *lc, MLIR_OpHandle op) {
@@ -602,6 +489,7 @@ static MLIR_OpHandle find_program_in_block(MLIR_BlockHandle block) {
 }
 
 bool ASR_LowerProgram(ASR_LoweringContext *lc, MLIR_OpHandle op) {
+    lc->n_sym_slots = 0;
     lc->fn_region = MLIR_CreateRegion(lc->ctx);
     lc->cur_block = MLIR_CreateBlock(lc->ctx);
     MLIR_AppendRegionBlock(lc->ctx, lc->fn_region, lc->cur_block);
@@ -639,14 +527,14 @@ static MLIR_ValueHandle lower_expr_value(ASR_LoweringContext *lc, MLIR_OpHandle 
         }
         case ASR_DIALECT_OP_EXPR_VAR: {
             string sym = get_str(op, "v");
-            ASR_SymSlot *slot = lookup_sym(sym);
+            ASR_SymSlot *slot = lookup_sym(lc, sym);
             if (!slot) {
                 return MLIR_INVALID_HANDLE;
             }
             if (slot->is_array) {
                 return MLIR_INVALID_HANDLE;
             }
-            return emit_memref_load_scalar(lc, slot);
+            return emit_memref_load_at(lc, slot, emit_const_index(lc, 0));
         }
         case ASR_DIALECT_OP_EXPR_INTEGERBINOP: {
             MLIR_ValueHandle lhs = lower_expr_value(lc, get_op_ref(op, "left"));
@@ -659,6 +547,13 @@ static MLIR_ValueHandle lower_expr_value(ASR_LoweringContext *lc, MLIR_OpHandle 
                 case 1: ty = OP_TYPE_ARITH_SUBI; nm = str_lit("arith.subi"); break;
                 case 2: ty = OP_TYPE_ARITH_MULI; nm = str_lit("arith.muli"); break;
                 case 3: ty = OP_TYPE_ARITH_DIVSI; nm = str_lit("arith.divsi"); break;
+                default:
+                    if (lc->options && lc->options->allow_unimplemented_nodes) {
+                        return emit_const_i32(lc, 0);
+                    }
+                    ASR_LowerUnsupported(lc, op,
+                        "IntegerBinOp: unsupported binop");
+                    return MLIR_INVALID_HANDLE;
             }
             MLIR_ValueHandle res = MLIR_CreateValueOpResult(lc->ctx,
                 MLIR_INVALID_HANDLE, 0, lc->i32_ty, arena_ssa(lc), lc->loc);
@@ -717,6 +612,14 @@ static MLIR_ValueHandle lower_expr_value(ASR_LoweringContext *lc, MLIR_OpHandle 
             return lower_array_item_value(lc, op);
         case ASR_DIALECT_OP_EXPR_ARRAYCONSTRUCTOR:
             return emit_const_i32(lc, 0);
+        case ASR_DIALECT_OP_EXPR_ARRAYCONSTANT: {
+            MLIR_OpHandle *elems = asr_get_field_op_seq(op, "elements");
+            size_t n = asr_get_field_op_seq_count(op, "elements");
+            if (elems && n > 0) {
+                return lower_expr_value(lc, elems[0]);
+            }
+            return MLIR_INVALID_HANDLE;
+        }
         default:
             if (lc->options && lc->options->allow_unimplemented_nodes) {
                 return emit_const_i32(lc, 0);
@@ -745,6 +648,14 @@ static MLIR_ValueHandle lower_expr_i1(ASR_LoweringContext *lc, MLIR_OpHandle op)
     return MLIR_INVALID_HANDLE;
 }
 
+static bool lower_expr_op(ASR_LoweringContext *lc, MLIR_OpHandle op) {
+    return lower_expr_value(lc, op) != MLIR_INVALID_HANDLE;
+}
+
+static bool lower_expr_i1_op(ASR_LoweringContext *lc, MLIR_OpHandle op) {
+    return lower_expr_i1(lc, op) != MLIR_INVALID_HANDLE;
+}
+
 static void init_types(ASR_LoweringContext *lc) {
     lc->i32_ty = MLIR_CreateTypeInteger(lc->ctx, 32, true);
     lc->i64_ty = MLIR_CreateTypeInteger(lc->ctx, 64, false);
@@ -754,97 +665,93 @@ static void init_types(ASR_LoweringContext *lc) {
     lc->memref_i32_1_ty = MLIR_CreateTypeMemref(lc->ctx, shape, 1, lc->i32_ty);
 }
 
-// Stub handlers for remaining focused ops (expand incrementally).
+// Expression dispatch: thin wrappers over lower_expr_value() / lower_expr_i1().
+bool ASR_LowerIntegerConstant(ASR_LoweringContext *lc, MLIR_OpHandle op) {
+    return lower_expr_op(lc, op);
+}
+bool ASR_LowerVar(ASR_LoweringContext *lc, MLIR_OpHandle op) {
+    return lower_expr_op(lc, op);
+}
+bool ASR_LowerIntegerBinOp(ASR_LoweringContext *lc, MLIR_OpHandle op) {
+    return lower_expr_op(lc, op);
+}
 bool ASR_LowerIntegerCompare(ASR_LoweringContext *lc, MLIR_OpHandle op) {
-    (void)lower_expr_i1(lc, op);
-    return true;
+    return lower_expr_i1_op(lc, op);
 }
 bool ASR_LowerIntegerUnaryMinus(ASR_LoweringContext *lc, MLIR_OpHandle op) {
-    (void)lower_expr_value(lc, op);
-    return true;
+    return lower_expr_op(lc, op);
 }
 bool ASR_LowerIntegerBitNot(ASR_LoweringContext *lc, MLIR_OpHandle op) {
-    return ASR_LowerUnsupported(lc, op, "IntegerBitNot lowering pending");
+    return lower_expr_op(lc, op);
 }
 bool ASR_LowerRealConstant(ASR_LoweringContext *lc, MLIR_OpHandle op) {
-    return ASR_LowerUnsupported(lc, op, "RealConstant lowering pending");
+    return lower_expr_op(lc, op);
 }
 bool ASR_LowerRealBinOp(ASR_LoweringContext *lc, MLIR_OpHandle op) {
-    (void)lower_expr_value(lc, op);
-    return true;
+    return lower_expr_op(lc, op);
 }
 bool ASR_LowerRealCompare(ASR_LoweringContext *lc, MLIR_OpHandle op) {
-    return ASR_LowerUnsupported(lc, op, "RealCompare lowering pending");
+    return lower_expr_op(lc, op);
 }
 bool ASR_LowerRealUnaryMinus(ASR_LoweringContext *lc, MLIR_OpHandle op) {
-    return ASR_LowerUnsupported(lc, op, "RealUnaryMinus lowering pending");
+    return lower_expr_op(lc, op);
 }
 bool ASR_LowerCast(ASR_LoweringContext *lc, MLIR_OpHandle op) {
-    (void)lower_expr_value(lc, op);
-    return true;
+    return lower_expr_op(lc, op);
 }
 bool ASR_LowerLogicalConstant(ASR_LoweringContext *lc, MLIR_OpHandle op) {
-    (void)lower_expr_value(lc, op);
-    return true;
+    return lower_expr_op(lc, op);
 }
 bool ASR_LowerLogicalNot(ASR_LoweringContext *lc, MLIR_OpHandle op) {
-    (void)lower_expr_value(lc, op);
-    return true;
+    return lower_expr_op(lc, op);
 }
 bool ASR_LowerLogicalBinOp(ASR_LoweringContext *lc, MLIR_OpHandle op) {
-    MLIR_ValueHandle lhs = lower_expr_value(lc, get_op_ref(op, "left"));
-    MLIR_ValueHandle rhs = lower_expr_value(lc, get_op_ref(op, "right"));
-    int64_t bop = get_i64(op, "op", 0);
-    if (bop == 0) {
-        (void)emit_binop_i32(lc, OP_TYPE_ARITH_ANDI, str_lit("arith.andi"), lhs, rhs);
-    } else {
-        (void)emit_binop_i32(lc, OP_TYPE_ARITH_ORI, str_lit("arith.ori"), lhs, rhs);
-    }
-    return true;
+    return lower_expr_op(lc, op);
 }
 bool ASR_LowerLogicalCompare(ASR_LoweringContext *lc, MLIR_OpHandle op) {
-    return ASR_LowerUnsupported(lc, op, "LogicalCompare lowering pending");
+    return lower_expr_op(lc, op);
+}
+bool ASR_LowerStringFormat(ASR_LoweringContext *lc, MLIR_OpHandle op) {
+    return lower_expr_op(lc, op);
 }
 bool ASR_LowerArrayItem(ASR_LoweringContext *lc, MLIR_OpHandle op) {
-    (void)lower_array_item_value(lc, op);
-    return true;
+    return lower_expr_op(lc, op);
 }
 bool ASR_LowerArrayConstant(ASR_LoweringContext *lc, MLIR_OpHandle op) {
-    return ASR_LowerUnsupported(lc, op, "ArrayConstant lowering pending");
+    return lower_expr_op(lc, op);
 }
 bool ASR_LowerArrayConstructor(ASR_LoweringContext *lc, MLIR_OpHandle op) {
-    (void)op;
-    return true;
+    return lower_expr_op(lc, op);
 }
 bool ASR_LowerArraySize(ASR_LoweringContext *lc, MLIR_OpHandle op) {
-    return ASR_LowerUnsupported(lc, op, "ArraySize lowering pending");
+    return lower_expr_op(lc, op);
 }
 bool ASR_LowerArrayBound(ASR_LoweringContext *lc, MLIR_OpHandle op) {
-    return ASR_LowerUnsupported(lc, op, "ArrayBound lowering pending");
+    return lower_expr_op(lc, op);
 }
 bool ASR_LowerArraySection(ASR_LoweringContext *lc, MLIR_OpHandle op) {
-    return ASR_LowerUnsupported(lc, op, "ArraySection lowering pending");
+    return lower_expr_op(lc, op);
 }
 bool ASR_LowerArrayTranspose(ASR_LoweringContext *lc, MLIR_OpHandle op) {
-    return ASR_LowerUnsupported(lc, op, "ArrayTranspose lowering pending");
+    return lower_expr_op(lc, op);
 }
 bool ASR_LowerArrayReshape(ASR_LoweringContext *lc, MLIR_OpHandle op) {
-    return ASR_LowerUnsupported(lc, op, "ArrayReshape lowering pending");
+    return lower_expr_op(lc, op);
 }
 bool ASR_LowerArrayPhysicalCast(ASR_LoweringContext *lc, MLIR_OpHandle op) {
-    return ASR_LowerUnsupported(lc, op, "ArrayPhysicalCast lowering pending");
+    return lower_expr_op(lc, op);
 }
 bool ASR_LowerIntrinsicElementalFunction(ASR_LoweringContext *lc, MLIR_OpHandle op) {
-    return ASR_LowerUnsupported(lc, op, "IntrinsicElementalFunction lowering pending");
+    return lower_expr_op(lc, op);
 }
 bool ASR_LowerIntrinsicArrayFunction(ASR_LoweringContext *lc, MLIR_OpHandle op) {
-    return ASR_LowerUnsupported(lc, op, "IntrinsicArrayFunction lowering pending");
+    return lower_expr_op(lc, op);
 }
 bool ASR_LowerIntrinsicImpureFunction(ASR_LoweringContext *lc, MLIR_OpHandle op) {
-    return ASR_LowerUnsupported(lc, op, "IntrinsicImpureFunction lowering pending");
+    return lower_expr_op(lc, op);
 }
 bool ASR_LowerIntrinsicImpureSubroutine(ASR_LoweringContext *lc, MLIR_OpHandle op) {
-    return ASR_LowerUnsupported(lc, op, "IntrinsicImpureSubroutine lowering pending");
+    return lower_expr_op(lc, op);
 }
 bool ASR_LowerFunction(ASR_LoweringContext *lc, MLIR_OpHandle op) {
     return ASR_LowerUnsupported(lc, op, "Function lowering pending");
@@ -869,13 +776,13 @@ bool ASR_LowerDoLoop(ASR_LoweringContext *lc, MLIR_OpHandle op) {
         return ASR_LowerUnsupported(lc, op, "DoLoop: index must be a variable");
     }
     string sym = get_str(v_op, "v");
-    ASR_SymSlot *slot = lookup_sym(sym);
+    ASR_SymSlot *slot = lookup_sym(lc, sym);
     if (!slot || slot->is_array) {
         return ASR_LowerUnsupported(lc, op, "DoLoop: scalar loop variable required");
     }
 
     MLIR_ValueHandle start_v = lower_expr_value(lc, start_op);
-    emit_memref_store_scalar(lc, start_v, slot);
+    emit_memref_store_at(lc, start_v, slot, emit_const_index(lc, 0));
 
     MLIR_BlockHandle header_b = new_cfg_block(lc);
     MLIR_BlockHandle body_b = new_cfg_block(lc);
@@ -885,7 +792,7 @@ bool ASR_LowerDoLoop(ASR_LoweringContext *lc, MLIR_OpHandle op) {
 
     lc->cur_block = header_b;
     lc->block_terminated = false;
-    MLIR_ValueHandle iv = emit_memref_load_scalar(lc, slot);
+    MLIR_ValueHandle iv = emit_memref_load_at(lc, slot, emit_const_index(lc, 0));
     MLIR_ValueHandle endv = lower_expr_value(lc, end_op);
     MLIR_ValueHandle cond = emit_icmp_i32(lc, 3, iv, endv);
     emit_cond_branch(lc, cond, body_b, exit_b);
@@ -912,7 +819,7 @@ bool ASR_LowerDoLoop(ASR_LoweringContext *lc, MLIR_OpHandle op) {
 
     lc->cur_block = step_b;
     lc->block_terminated = false;
-    iv = emit_memref_load_scalar(lc, slot);
+    iv = emit_memref_load_at(lc, slot, emit_const_index(lc, 0));
     MLIR_ValueHandle stepv;
     if (inc_op != MLIR_INVALID_HANDLE) {
         stepv = lower_expr_value(lc, inc_op);
@@ -921,7 +828,7 @@ bool ASR_LowerDoLoop(ASR_LoweringContext *lc, MLIR_OpHandle op) {
     }
     MLIR_ValueHandle next = emit_binop_i32(lc, OP_TYPE_ARITH_ADDI,
         str_lit("arith.addi"), iv, stepv);
-    emit_memref_store_scalar(lc, next, slot);
+    emit_memref_store_at(lc, next, slot, emit_const_index(lc, 0));
     emit_branch(lc, header_b);
 
     lc->cur_block = exit_b;
@@ -995,8 +902,6 @@ bool ASR_DialectLowerModuleNative(
     if (MLIR_GetOpType(module) != OP_TYPE_MODULE) {
         return false;
     }
-    n_sym_slots = 0;
-
     ASR_LoweringContext lc = {};
     lc.ctx = ctx;
     lc.module = module;
