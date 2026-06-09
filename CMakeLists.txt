@@ -153,6 +153,8 @@ set(WITH_TARGET_AARCH64 no CACHE BOOL "Enable target AARCH64")
 set(WITH_TARGET_X86 no CACHE BOOL "Enable target X86")
 set(WITH_TARGET_WASM no CACHE BOOL "Enable target WebAssembly")
 set(WITH_MLIR no CACHE BOOL "Build with MLIR support")
+set(LFORTRAN_MLIR_WASM_LOWERING no CACHE BOOL
+    "Link native MLIR WebAssembly lowering (tinyc wasm pipeline)")
 
 # Stacktrace
 set(WITH_UNWIND no
@@ -277,6 +279,16 @@ if (WITH_LLVM)
         add_definitions("-DHAVE_TARGET_WASM=1")
     endif()
 
+    # WebAssembly LLVM components for optional MLIR wasm lowering (tinyc pipeline).
+    if (WITH_MLIR AND LFORTRAN_MLIR_WASM_LOWERING AND NOT WITH_TARGET_WASM)
+        if (NOT ("${LLVM_TARGETS_TO_BUILD}" MATCHES "WebAssembly"))
+            message(FATAL_ERROR
+                "LFORTRAN_MLIR_WASM_LOWERING requires LLVM with the WebAssembly "
+                "target in LLVM_TARGETS_TO_BUILD.")
+        endif()
+        list(APPEND LFORTRAN_LLVM_COMPONENTS webassemblyasmparser webassemblycodegen webassemblydesc webassemblydisassembler webassemblyinfo)
+    endif()
+
     if (TARGET LLVMCore)
         # If `LLVMCore` target is present, then LLVM is distributed as separate
         # libraries and llvm_map_components_to_libnames() should work:
@@ -293,15 +305,10 @@ if (WITH_LLVM)
     if (WITH_MLIR)
         add_library(p::mlir INTERFACE IMPORTED)
         find_package(MLIR REQUIRED CONFIG)
-        set(mlir_libs
-                MLIRIR
-                MLIRLLVMToLLVMIRTranslation
-                MLIRBuiltinToLLVMIRTranslation
-                MLIRLLVMDialect
-                MLIROpenMPToLLVMIRTranslation
-                MLIROpenMPDialect
-            )
-        set_property(TARGET p::mlir PROPERTY INTERFACE_LINK_LIBRARIES ${mlir_libs})
+        include(LFortranMLIRLink)
+        set_property(TARGET p::mlir PROPERTY INTERFACE_INCLUDE_DIRECTORIES
+            ${MLIR_INCLUDE_DIRS})
+        set_property(TARGET p::mlir PROPERTY INTERFACE_LINK_LIBRARIES ${LFORTRAN_MLIR_LINK_LIBS})
         set(HAVE_LFORTRAN_MLIR yes)
     endif()
 
