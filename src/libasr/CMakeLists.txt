@@ -94,7 +94,11 @@ if (WITH_LLVM)
         codegen/llvm_utils.cpp
     )
     if (WITH_MLIR)
-        set(SRC ${SRC} codegen/asr_to_mlir.cpp)
+        set(SRC ${SRC}
+            codegen/asr_to_mlir.cpp
+            codegen/asr_to_asr_dialect.cpp
+            codegen/asr_to_mlir_new.cpp
+        )
     endif()
     # We use deprecated API in LLVM, so we disable the warning until we upgrade
     if (NOT MSVC)
@@ -151,6 +155,12 @@ if (WITH_LLVM)
     if (EMSCRIPTEN)
         target_link_libraries(asr lldWasm lldCommon)
     endif()
+endif()
+if (WITH_MLIR)
+    target_link_libraries(asr lfortran_mlir_c_api lfortran_asr_dialect)
+    target_include_directories(asr BEFORE PUBLIC
+        ${libasr_SOURCE_DIR}/../mlir/lfortran
+        ${libasr_SOURCE_DIR}/../mlir)
 endif()
 
 # Install the dwarf_convert.py and dat_convert.py
