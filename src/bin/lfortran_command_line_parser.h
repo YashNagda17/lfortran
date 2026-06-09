@@ -44,6 +44,9 @@ namespace LCompilers::CommandLineInterface {
         bool arg_no_prescan = false;
         bool show_llvm = false;
         bool show_mlir = false;
+        bool show_mlir_high_dialect = false;
+        bool show_mlir_asr_dialect = false;
+        bool show_mlir_llvm_dialect = false;
         bool show_llvm_from_mlir = false;
         bool show_cpp = false;
         bool show_c = false;

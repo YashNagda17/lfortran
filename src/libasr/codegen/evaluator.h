@@ -52,10 +52,23 @@ public:
     std::unique_ptr<mlir::MLIRContext> mlir_ctx;
     std::unique_ptr<llvm::Module> llvm_m;
     std::unique_ptr<llvm::LLVMContext> llvm_ctx;
+    // Filled by asr_to_mlir_new: ASR dialect snapshot after stage 1.
+    std::string mlir_asr_dialect_text;
+    // Filled by asr_to_mlir_new: high-level MLIR before lowering.
+    std::string mlir_high_dialect_str;
+    // LLVM-dialect MLIR snapshot after MLIR_LowerToLLVMDialect.
+    std::string mlir_llvm_dialect_text;
+    // LLVM IR text from MLIR translateModuleToLLVMIR.
+    std::string llvm_ir_from_mlir_api;
     MLIRModule(std::unique_ptr<mlir::ModuleOp> m,
         std::unique_ptr<mlir::MLIRContext> ctx);
+    MLIRModule(std::string mlir_high_dialect, std::string mlir_llvm_dialect,
+        std::string llvm_ir_from_mlir);
     ~MLIRModule();
     std::string mlir_str();
+    std::string mlir_high_dialect_dump() const;
+    std::string mlir_asr_dialect_dump() const;
+    std::string mlir_llvm_dialect_dump() const;
     std::string llvm_str();
     void mlir_to_llvm(llvm::LLVMContext &ctx);
 };

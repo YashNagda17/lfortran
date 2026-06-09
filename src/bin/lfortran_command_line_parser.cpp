@@ -299,7 +299,18 @@ namespace LCompilers::CommandLineInterface {
         app.add_flag("--no-loc", compiler_options.po.no_loc, "Skip location information in ASR/AST Json format")->group(group_output_debugging_options);
         app.add_flag("--visualize", compiler_options.po.visualize, "Print ASR/AST Visualization")->group(group_output_debugging_options);
         app.add_flag("--show-llvm", opts.show_llvm, "Show LLVM IR for the given file and exit")->group(group_output_debugging_options);
-        app.add_flag("--show-mlir", opts.show_mlir, "Show MLIR for the given file and exit")->group(group_output_debugging_options);
+        app.add_flag("--show-mlir", opts.show_mlir,
+            "Show MLIR for the given file and exit; with `--backend=mlir-new` "
+            "shows high-level MLIR (func/memref/arith) before lowering")->group(group_output_debugging_options);
+        app.add_flag("--show-mlir-high-dialect", opts.show_mlir_high_dialect,
+            "Show high-level MLIR from `--backend=mlir-new` and exit; "
+            "implies mlir-new pipeline when set alone")->group(group_output_debugging_options);
+        app.add_flag("--show-mlir-asr-dialect", opts.show_mlir_asr_dialect,
+            "Show ASR MLIR dialect (stage 1) from `--backend=mlir-new` and exit; "
+            "implies mlir-new pipeline when set alone")->group(group_output_debugging_options);
+        app.add_flag("--show-mlir-llvm-dialect", opts.show_mlir_llvm_dialect,
+            "Show LLVM-dialect MLIR emitted by `--backend=mlir-new` and exit; "
+            "implies mlir-new pipeline when set alone")->group(group_output_debugging_options);
         app.add_flag("--show-llvm-from-mlir", opts.show_llvm_from_mlir, "Show LLVM IR translated from MLIR for the given file and exit")->group(group_output_debugging_options);
         app.add_flag("--show-cpp", opts.show_cpp, "Show C++ translation source for the given file and exit")->group(group_output_debugging_options);
         app.add_flag("--show-c", opts.show_c, "Show C translation source for the given file and exit")->group(group_output_debugging_options);
@@ -319,7 +330,7 @@ namespace LCompilers::CommandLineInterface {
         app.add_flag("--cumulative", compiler_options.po.pass_cumulative, "Apply all the passes cumulatively till the given pass")->group(group_pass_transformation_options);
 
         // Backend and code generation-related flags
-        app.add_option("--backend", opts.arg_backend, "Select a backend (llvm, c, cpp, x86, wasm, fortran, mlir)")->capture_default_str()->group(group_backend_codegen_options);
+        app.add_option("--backend", opts.arg_backend, "Select a backend (llvm, c, cpp, x86, wasm, fortran, mlir, mlir-new)")->capture_default_str()->group(group_backend_codegen_options);
         app.add_flag("--openmp", compiler_options.openmp, "Enable openmp")->group(group_backend_codegen_options);
         app.add_flag("--target-offload", compiler_options.target_offload_enabled, "Enable Target Offloading")->group(group_backend_codegen_options);
         app.add_flag("--openmp-lib-dir", compiler_options.openmp_lib_dir, "Pass path to openmp library")->capture_default_str()->group(group_backend_codegen_options);

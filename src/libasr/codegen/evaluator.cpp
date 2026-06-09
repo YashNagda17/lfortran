@@ -171,16 +171,57 @@ MLIRModule::MLIRModule(std::unique_ptr<mlir::ModuleOp> m,
     llvm_ctx = std::make_unique<llvm::LLVMContext>();
 }
 
+MLIRModule::MLIRModule(std::string mlir_high_dialect, std::string mlir_llvm_dialect,
+        std::string llvm_ir_from_mlir)
+    : mlir_high_dialect_str(std::move(mlir_high_dialect)),
+      mlir_llvm_dialect_text(std::move(mlir_llvm_dialect)),
+      llvm_ir_from_mlir_api(std::move(llvm_ir_from_mlir)) {
+    llvm_ctx = std::make_unique<llvm::LLVMContext>();
+}
+
 MLIRModule::~MLIRModule() {
     llvm_m.reset();
     llvm_ctx.reset();
 };
 
 std::string MLIRModule::mlir_str() {
+    if (!mlir_high_dialect_str.empty()) {
+        return mlir_high_dialect_str;
+    }
     std::string mlir_str;
     llvm::raw_string_ostream raw_os(mlir_str);
     mlir_m->print(raw_os);
     return mlir_str;
+}
+
+std::string MLIRModule::mlir_high_dialect_dump() const {
+    if (!mlir_high_dialect_str.empty()) {
+        return mlir_high_dialect_str;
+    }
+    if (mlir_m) {
+        std::string out;
+        llvm::raw_string_ostream raw_os(out);
+        mlir_m->print(raw_os);
+        return out;
+    }
+    return "";
+}
+
+std::string MLIRModule::mlir_asr_dialect_dump() const {
+    return mlir_asr_dialect_text;
+}
+
+std::string MLIRModule::mlir_llvm_dialect_dump() const {
+    if (!mlir_llvm_dialect_text.empty()) {
+        return mlir_llvm_dialect_text;
+    }
+    if (mlir_m) {
+        std::string out;
+        llvm::raw_string_ostream raw_os(out);
+        mlir_m->print(raw_os);
+        return out;
+    }
+    return "";
 }
 
 std::string MLIRModule::llvm_str() {
@@ -191,6 +232,22 @@ std::string MLIRModule::llvm_str() {
 }
 
 void MLIRModule::mlir_to_llvm(llvm::LLVMContext &ctx) {
+    if (!llvm_ir_from_mlir_api.empty()) {
+        llvm::SMDiagnostic err;
+        std::unique_ptr<llvm::Module> llvmModule = llvm::parseAssemblyString(
+            llvm_ir_from_mlir_api, err, ctx);
+        if (!llvmModule) {
+            err.print("mlir-new", llvm::errs());
+            throw LCompilersException(
+                "failed to parse llvm ir produced by mlir-new path");
+        }
+        if (llvm::verifyModule(*llvmModule)) {
+            throw LCompilersException(
+                "llvm module verification failed for mlir-new path");
+        }
+        llvm_m = std::move(llvmModule);
+        return;
+    }
     std::unique_ptr<llvm::Module> llvmModule = mlir::translateModuleToLLVMIR(
         *mlir_m, ctx);
     if (llvmModule) {
