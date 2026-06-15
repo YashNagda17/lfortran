@@ -14,6 +14,10 @@
 #include <libasr/pass/pass_manager.h>
 #include <libasr/utils.h>
 
+extern "C" {
+#include <mlir_new_backend.h>
+}
+
 namespace LCompilers {
 
 class LLVMModule;
@@ -113,6 +117,9 @@ public:
         LocationManager &lm, diag::Diagnostics &diagnostics);
     Result<std::unique_ptr<MLIRModule>> get_mlir(
         ASR::asr_t &asr, diag::Diagnostics &diagnostics);
+    Result<std::unique_ptr<MLIRModule>> get_mlir_new(
+        ASR::asr_t &asr, diag::Diagnostics &diagnostics,
+        MlirNewBackendKind backend);
     Result<std::string> get_fortran(const std::string &code,
         LocationManager &lm, diag::Diagnostics &diagnostics,
         LCompilers::PassManager& pass_manager);

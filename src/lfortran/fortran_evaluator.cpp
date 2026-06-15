@@ -26,6 +26,7 @@
 #include <libasr/codegen/asr_to_llvm.h>
 #ifdef HAVE_LFORTRAN_MLIR
 #include <libasr/codegen/asr_to_mlir.h>
+#include <libasr/codegen/asr_to_mlir_new.h>
 #endif
 #else
 namespace LCompilers {
@@ -614,6 +615,39 @@ Result<std::unique_ptr<MLIRModule>> FortranEvaluator::get_mlir(
     }
 
     // MLIR -> LLVM
+    m->mlir_to_llvm(*m->llvm_ctx);
+    return m;
+#else
+    throw LCompilersException("MLIR is not enabled");
+#endif
+}
+
+Result<std::unique_ptr<MLIRModule>> FortranEvaluator::get_mlir_new(
+#ifdef HAVE_LFORTRAN_MLIR
+        ASR::asr_t &asr, diag::Diagnostics &diagnostics,
+        MlirNewBackendKind backend
+#else
+        ASR::asr_t &/*asr*/, diag::Diagnostics &/*diagnostics*/,
+        MlirNewBackendKind /*backend*/
+#endif
+) {
+#ifdef HAVE_LFORTRAN_MLIR
+    std::unique_ptr<LCompilers::MLIRModule> m;
+    LCompilers::PassManager pass_manager;
+    if (ASR::is_a<ASR::unit_t>(asr)) {
+        pass_manager.use_default_passes();
+        pass_manager.apply_passes(al, (ASR::TranslationUnit_t *)&asr,
+            compiler_options.po, diagnostics);
+    }
+    Result<std::unique_ptr<MLIRModule>> res = asr_to_mlir_new(al,
+        (ASR::asr_t &)asr, diagnostics, backend);
+    if (res.ok) {
+        m = std::move(res.result);
+    } else {
+        LCOMPILERS_ASSERT(diagnostics.has_error())
+        return res.error;
+    }
+
     m->mlir_to_llvm(*m->llvm_ctx);
     return m;
 #else

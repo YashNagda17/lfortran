@@ -52,10 +52,17 @@ public:
     std::unique_ptr<mlir::MLIRContext> mlir_ctx;
     std::unique_ptr<llvm::Module> llvm_m;
     std::unique_ptr<llvm::LLVMContext> llvm_ctx;
+    // Filled by asr_to_mlir_new: LLVM IR text from translateModuleToLLVMIR.
+    std::string llvm_ir_from_mlir_api;
+    // Optional LLVM-dialect MLIR snapshot from direct ASR emission.
+    std::string mlir_llvm_dialect_text;
     MLIRModule(std::unique_ptr<mlir::ModuleOp> m,
         std::unique_ptr<mlir::MLIRContext> ctx);
+    MLIRModule(std::string llvm_ir_from_mlir,
+        std::string mlir_llvm_dialect = std::string());
     ~MLIRModule();
     std::string mlir_str();
+    std::string mlir_llvm_dialect_dump() const;
     std::string llvm_str();
     void mlir_to_llvm(llvm::LLVMContext &ctx);
 };
