@@ -108,13 +108,6 @@ if (DEFINED LFORTRAN_CXX_NO_RTTI_FLAG)
 endif()
 target_compile_options(lfortran_mlir_upstream_impl PRIVATE
     $<$<COMPILE_LANGUAGE:CXX>:-include${LF_MLIR_LFORTRAN}/mlir_upstream_api_rename.h>)
-if (LFORTRAN_MLIR_WASM_LOWERING OR WITH_TARGET_WASM)
-    target_compile_definitions(lfortran_mlir_upstream_impl PRIVATE
-        LFORTRAN_MLIR_WASM_LOWERING=1)
-else()
-    target_sources(lfortran_mlir_upstream_impl PRIVATE
-        ${LF_MLIR_LFORTRAN}/mlir_api_impl_upstream_wasm_stubs.c)
-endif()
 # Do not PUBLIC-link pipeline here: CMake would place upstream_impl before
 # pipeline on the final link line, while mlir_new_backend.c (in pipeline)
 # references MLIR_Upstream_* from upstream_impl.

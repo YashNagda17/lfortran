@@ -279,11 +279,12 @@ if (WITH_LLVM)
         add_definitions("-DHAVE_TARGET_WASM=1")
     endif()
 
-    # WebAssembly LLVM components for optional MLIR wasm lowering (tinyc pipeline).
-    if (WITH_MLIR AND LFORTRAN_MLIR_WASM_LOWERING AND NOT WITH_TARGET_WASM)
+    # WebAssembly LLVM components for upstream wasm entry points in
+    # mlir_api_impl_upstream.cpp (linked whenever WITH_MLIR is on).
+    if (WITH_MLIR AND NOT WITH_TARGET_WASM)
         if (NOT ("${LLVM_TARGETS_TO_BUILD}" MATCHES "WebAssembly"))
             message(FATAL_ERROR
-                "LFORTRAN_MLIR_WASM_LOWERING requires LLVM with the WebAssembly "
+                "WITH_MLIR requires LLVM with the WebAssembly "
                 "target in LLVM_TARGETS_TO_BUILD.")
         endif()
         list(APPEND LFORTRAN_LLVM_COMPONENTS webassemblyasmparser webassemblycodegen webassemblydesc webassemblydisassembler webassemblyinfo)
